@@ -64,7 +64,8 @@ class _SkillMarketplaceScreenState
                 Padding(
                   padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
                   child: DropdownButtonFormField<MarketplaceSource>(
-                    value: selected,
+                    key: ValueKey(selected.id),
+                    initialValue: selected,
                     isExpanded: true,
                     decoration: const InputDecoration(
                       labelText: 'Source',

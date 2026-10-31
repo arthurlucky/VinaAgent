@@ -33,6 +33,7 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
   final _textController = TextEditingController();
   final _focusNode = FocusNode();
   final List<AttachmentMeta> _attachments = [];
+  String? _pendingSkill;
   bool _isListening = false;
   Timer? _listeningTimer;
 
