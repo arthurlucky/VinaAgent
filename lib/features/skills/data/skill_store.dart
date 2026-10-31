@@ -31,6 +31,22 @@ class SkillStore {
   static const int _maxResourceChars = 16000;
   static final RegExp _validName = RegExp(r'^[a-z0-9][a-z0-9-]{0,63}$');
 
+  /// Fallback triggers for bundled skills that were seeded by older versions
+  /// (before `triggers:` existed in the frontmatter).
+  static const Map<String, List<String>> _defaultTriggers = {
+    'research-report': [
+      'riset', 'laporan', 'research', 'report', 'analisis', 'perbandingan',
+    ],
+    'image-prompting': [
+      'gambar', 'image', 'foto', 'ilustrasi', 'wallpaper', 'logo', 'lukis',
+    ],
+    'android-automation': [
+      'android', 'hp', 'ponsel', 'otomasi', 'tap', 'ketuk',
+    ],
+    'code-review': ['review', 'kode', 'code', 'bug', 'refactor'],
+    'skill-authoring': ['skill', 'kemampuan', 'workflow', 'prosedur'],
+  };
+
   final SharedPreferences _prefs;
 
   /// Master switch for the whole skill system.
@@ -375,7 +391,10 @@ class SkillStore {
         if (description.contains(token)) score += 1;
       }
       if (name.split('-').any(tokens.contains)) score += 3;
-      for (final trigger in skill.triggers) {
+      final triggers = skill.triggers.isEmpty
+          ? (_defaultTriggers[skill.name] ?? const <String>[])
+          : skill.triggers;
+      for (final trigger in triggers) {
         if (trigger.isNotEmpty && lower.contains(trigger)) score += 6;
       }
 
