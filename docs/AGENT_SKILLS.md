@@ -87,6 +87,53 @@ in `SharedPreferences` under `marketplace_custom_sources`.
 Both index the same GitHub repositories, so installing from the upstream repo
 gives the same skills with no key and no proxy.
 
+## Auto-activation
+
+Skills must work even in plain chat mode, where the model cannot call tools.
+Before every request `ChatController._buildHistory` scores installed skills
+against the latest user message:
+
+- skill name tokens → +4
+- description tokens → +1
+- whole-word name tokens → +3
+- `triggers` from the frontmatter → +6
+
+The top two skills with a score of at least 4 are injected into the system
+prompt as `## Active skill: <name>` with their full `SKILL.md` body (truncated
+to 5000 chars, 1800 for local models). A skill can also be forced for one
+message with `/skill <name> <prompt>`.
+
+```markdown
+---
+name: research-report
+description: Produce a sourced research brief.
+triggers: [riset, laporan, research, report, analisis]
+---
+```
+
+`triggers` are optional, any language, and are stripped to lowercase words.
+
+## Slash commands
+
+The composer recognises `/` commands. Type `/` to open the suggestion list.
+
+| Command | Action |
+| --- | --- |
+| `/help` | Show every command |
+| `/skills` | Browse installed skills |
+| `/skill <name> [prompt]` | Force a skill for the next message |
+| `/marketplace` | Open the skill marketplace |
+| `/agent` | Switch to Agent mode |
+| `/chat` | Switch to plain Chat mode |
+| `/local` | Switch to an on-device model |
+| `/new` | Start a new conversation |
+| `/model` | Open model settings |
+| `/mcp` | Open MCP settings |
+| `/image <prompt>` | Generate an image (alias `/img`) |
+
+`/skill <name>` without a prompt pins the skill to the composer as a chip and
+applies it to the next message.
+
 ## Settings UI
 
 `Settings > Agent Skills` lists every installed skill, shows its body, lets the

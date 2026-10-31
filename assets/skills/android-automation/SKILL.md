@@ -1,6 +1,7 @@
 ---
 name: android-automation
 description: Safely drive the Android device with the automation tools. Use when the user asks to open an app, tap, type, scroll, toggle a setting, or run a multi-step phone task.
+triggers: [android, hp, ponsel, otomasi, automation, tap, ketuk, buka aplikasi]
 ---
 
 # Android Automation

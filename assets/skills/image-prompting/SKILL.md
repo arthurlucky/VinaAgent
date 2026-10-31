@@ -1,6 +1,7 @@
 ---
 name: image-prompting
 description: Write strong prompts for the generate_image tool. Use whenever the user asks to create, draw, design, render, or edit an image, logo, wallpaper, or illustration.
+triggers: [gambar, image, foto, ilustrasi, wallpaper, logo, lukis, draw]
 ---
 
 # Image Prompting

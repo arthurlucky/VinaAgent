@@ -19,6 +19,7 @@ import 'package:pocketstrike/features/providers/data/mock_provider.dart';
 import 'package:pocketstrike/features/providers/domain/ai_provider.dart';
 import 'package:pocketstrike/features/providers/domain/provider_types.dart';
 import 'package:pocketstrike/features/skills/application/skills_controller.dart';
+import 'package:pocketstrike/features/skills/domain/agent_skill.dart';
 import 'package:pocketstrike/shared/widgets/confirm_action_sheet.dart';
 import 'package:uuid/uuid.dart';
 
@@ -165,6 +166,7 @@ class ChatController extends StateNotifier<ChatState> {
   Future<void> sendMessage({
     required String text,
     List<AttachmentMeta> attachments = const [],
+    String? activeSkillName,
   }) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty && attachments.isEmpty) return;
@@ -247,7 +249,11 @@ class ChatController extends StateNotifier<ChatState> {
     await _maybeAutoTitle(conversationId, trimmed);
 
     // 4. Build provider history (system prompt from persona + prior msgs).
-    final history = await _buildHistory(conversationId, params);
+    final history = await _buildHistory(
+      conversationId,
+      params,
+      activeSkillName: activeSkillName,
+    );
 
     final localStore = ref.read(localModelStoreProvider);
     final isImageRequest = (state.localMode && localStore.activeModel?.type == LocalModelType.imageModel) || isExplicitImage;
@@ -722,8 +728,9 @@ class ChatController extends StateNotifier<ChatState> {
 
   Future<List<ChatMessage>> _buildHistory(
     String conversationId,
-    GenerationParams params,
-  ) async {
+    GenerationParams params, {
+    String? activeSkillName,
+  }) async {
     final rawMsgs = await ref
         .read(appDatabaseProvider)
         .messagesDao
@@ -779,6 +786,19 @@ class ChatController extends StateNotifier<ChatState> {
       systemPrompt = 'You are PocketStrike AI, a helpful, intelligent, and concise assistant.';
     }
 
+    // Skills: agent mode gets the full progressive-disclosure catalog
+    // (Level 1). Plain chat gets a compact list so the model still knows which
+    // skills exist.
+    final skillStore = ref.read(skillStoreProvider);
+    final skillsAvailable = skillStore.globallyEnabled;
+    List<AgentSkill> installedSkills = const [];
+    if (skillsAvailable) {
+      await skillStore.ensureSeeded();
+      installedSkills = (await skillStore.listSkills())
+          .where((skill) => skill.enabled)
+          .toList();
+    }
+
     if (state.agentMode) {
       const agentImageInstruction =
           'You have full capabilities to generate images using the "generate_image" tool. When the user asks you to generate, create, draw, paint, design, or render an image, artwork, illustration, photo, or wallpaper, ALWAYS call the "generate_image" tool with a detailed, creative visual prompt and "1:1" aspect ratio unless specified otherwise.';
@@ -786,11 +806,58 @@ class ChatController extends StateNotifier<ChatState> {
           ? agentImageInstruction
           : '$systemPrompt\n\n$agentImageInstruction';
 
-      final skillCatalog = await ref.read(skillCatalogProvider.future);
-      if (skillCatalog.isNotEmpty) {
-        systemPrompt = systemPrompt.isEmpty
-            ? skillCatalog
-            : '$systemPrompt\n\n$skillCatalog';
+      if (installedSkills.isNotEmpty) {
+        final skillCatalog = await skillStore.buildCatalogPrompt();
+        if (skillCatalog.isNotEmpty) {
+          systemPrompt = systemPrompt.isEmpty
+              ? skillCatalog
+              : '$systemPrompt\n\n$skillCatalog';
+        }
+      }
+    } else if (installedSkills.isNotEmpty) {
+      final catalog =
+          installedSkills.map((skill) => skill.catalogLine).join('\n');
+      final block = '## Installed skills\n$catalog\n\n'
+          'Apply a skill automatically when the task matches it. '
+          'Use /skill <name> to force one.';
+      systemPrompt = systemPrompt.isEmpty ? block : '$systemPrompt\n\n$block';
+    }
+
+    // Auto-activate the most relevant skills (Level 2). This makes skills work
+    // in plain chat mode too, where tool calling is unavailable.
+    if (skillsAvailable) {
+      String? latestUserText;
+      for (final message in chatMsgs.reversed) {
+        if (message.role == MessageRole.user &&
+            message.content.trim().isNotEmpty) {
+          latestUserText = message.content;
+          break;
+        }
+      }
+
+      final activated = <AgentSkill>[];
+      final forced = activeSkillName?.trim() ?? '';
+      if (forced.isNotEmpty) {
+        final skill = await skillStore.findSkill(forced);
+        if (skill != null) activated.add(skill);
+      }
+      if (latestUserText != null) {
+        for (final skill in await skillStore.matchSkills(latestUserText)) {
+          if (!activated.any((existing) => existing.name == skill.name)) {
+            activated.add(skill);
+          }
+        }
+      }
+
+      for (final skill in activated) {
+        final maxChars = state.localMode ? 1800 : 5000;
+        final body = skill.body.length > maxChars
+            ? '${skill.body.substring(0, maxChars)}\n\n[...truncated]'
+            : skill.body;
+        final block = '## Active skill: ${skill.name}\n'
+            '${skill.description}\n\n'
+            '$body';
+        systemPrompt = systemPrompt.isEmpty ? block : '$systemPrompt\n\n$block';
       }
     }
 

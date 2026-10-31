@@ -105,13 +105,27 @@ class SkillStore {
     return skills;
   }
 
-  /// Looks a skill up by its directory name.
+  /// Looks a skill up by its directory name or by its frontmatter name.
   Future<AgentSkill?> findSkill(String name) async {
-    if (!_validName.hasMatch(name)) return null;
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return null;
+
     final root = await _root();
-    final dir = Directory(p.join(root.path, name));
-    if (!await dir.exists()) return null;
-    return _readSkill(dir);
+    final normalized = _normalizeName(trimmed);
+    if (_validName.hasMatch(normalized)) {
+      final dir = Directory(p.join(root.path, normalized));
+      if (await dir.exists()) {
+        final skill = await _readSkill(dir);
+        if (skill != null) return skill;
+      }
+    }
+
+    // Marketplace skills may keep a human-readable frontmatter name, so the
+    // folder name and the skill name can differ.
+    for (final skill in await listSkills()) {
+      if (skill.name == trimmed || skill.name == normalized) return skill;
+    }
+    return null;
   }
 
   Future<AgentSkill?> _readSkill(Directory dir) async {
@@ -132,6 +146,7 @@ class SkillStore {
         resources: resources,
         bundled: await marker.exists(),
         enabled: isEnabled(parsed.name),
+        triggers: parsed.triggers,
       );
     } catch (_) {
       return null;
@@ -331,6 +346,44 @@ class SkillStore {
       buffer.writeln(skill.catalogLine);
     }
     return buffer.toString().trim();
+  }
+
+  /// Scores installed skills against [text] and returns the best matches.
+  ///
+  /// Used to auto-activate a skill (Level 2) when the user's message clearly
+  /// matches its name or description, so skills also work in plain chat mode
+  /// where the model cannot call `load_skill`.
+  Future<List<AgentSkill>> matchSkills(String text, {int limit = 2}) async {
+    if (!globallyEnabled) return const [];
+
+    final lower = text.toLowerCase();
+    final tokens = lower
+        .split(RegExp(r'[^a-z0-9]+'))
+        .where((token) => token.length > 2)
+        .toSet();
+    if (tokens.isEmpty) return const [];
+
+    final scored = <(AgentSkill, int)>[];
+    for (final skill in await listSkills()) {
+      if (!skill.enabled) continue;
+
+      final name = skill.name.toLowerCase();
+      final description = skill.description.toLowerCase();
+      var score = 0;
+      for (final token in tokens) {
+        if (name.contains(token)) score += 4;
+        if (description.contains(token)) score += 1;
+      }
+      if (name.split('-').any(tokens.contains)) score += 3;
+      for (final trigger in skill.triggers) {
+        if (trigger.isNotEmpty && lower.contains(trigger)) score += 6;
+      }
+
+      if (score >= 4) scored.add((skill, score));
+    }
+
+    scored.sort((a, b) => b.$2.compareTo(a.$2));
+    return scored.take(limit).map((entry) => entry.$1).toList();
   }
 
   String _normalizeName(String raw) {

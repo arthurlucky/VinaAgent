@@ -17,11 +17,15 @@ class AgentSkill {
     required this.resources,
     required this.bundled,
     required this.enabled,
+    this.triggers = const [],
   });
 
   final String name;
   final String description;
   final String body;
+
+  /// Optional keywords (any language) that auto-activate the skill.
+  final List<String> triggers;
 
   /// Absolute path of the skill directory on the device.
   final String directory;
@@ -43,6 +47,7 @@ class AgentSkill {
         resources: resources,
         bundled: bundled,
         enabled: enabled ?? this.enabled,
+        triggers: triggers,
       );
 
   /// Single line used in the Level-1 system-prompt catalog.

@@ -8,11 +8,15 @@ class ParsedSkill {
     required this.name,
     required this.description,
     required this.body,
+    this.triggers = const [],
   });
 
   final String name;
   final String description;
   final String body;
+
+  /// Optional keywords (any language) that auto-activate the skill.
+  final List<String> triggers;
 }
 
 /// Parses the YAML frontmatter and markdown body of a `SKILL.md` file.
@@ -33,7 +37,6 @@ class SkillParser {
 
   static final RegExp _frontmatter =
       RegExp(r'^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)');
-  static final RegExp _validName = RegExp(r'^[a-z0-9][a-z0-9-]{0,63}$');
   static final RegExp _xmlTag = RegExp(r'<[^>]*>');
 
   static ParsedSkill parse(String raw, {String? fallbackName}) {
@@ -55,11 +58,12 @@ class SkillParser {
       throw SkillFormatException('Frontmatter must be a YAML mapping');
     }
 
-    final name = _text(frontmatter['name']) ?? fallbackName?.trim() ?? '';
-    if (!_validName.hasMatch(name)) {
+    // Third-party skills often use human-readable names ("PDF Processing").
+    // Normalise them instead of rejecting the whole skill.
+    final name = _slugify(_text(frontmatter['name']) ?? fallbackName ?? '');
+    if (name.isEmpty) {
       throw SkillFormatException(
-        'Invalid skill name "$name": use lowercase letters, numbers and '
-        'hyphens (max 64 characters)',
+        'Invalid skill name: use letters, numbers and hyphens.',
       );
     }
 
@@ -82,7 +86,39 @@ class SkillParser {
       name: name,
       description: description,
       body: body,
+      triggers: _triggers(frontmatter['triggers']),
     );
+  }
+
+  static List<String> _triggers(dynamic value) {
+    final raw = <String>[];
+    if (value is Iterable) {
+      for (final item in value) {
+        final text = _text(item);
+        if (text != null) raw.add(text);
+      }
+    } else {
+      final text = _text(value);
+      if (text != null) raw.addAll(text.split(','));
+    }
+
+    return raw
+        .map((item) => _slugify(item).replaceAll('-', ' '))
+        .where((item) => item.isNotEmpty)
+        .toSet()
+        .take(20)
+        .toList();
+  }
+
+  static String _slugify(String raw) {
+    var name = raw.trim().toLowerCase();
+    name = name.replaceAll(RegExp(r'[^a-z0-9]+'), '-');
+    name = name.replaceAll(RegExp(r'-+'), '-');
+    name = name.replaceAll(RegExp(r'^-+|-+$'), '');
+    if (name.length > 64) {
+      name = name.substring(0, 64).replaceAll(RegExp(r'-+$'), '');
+    }
+    return name;
   }
 
   static String? _text(dynamic value) {

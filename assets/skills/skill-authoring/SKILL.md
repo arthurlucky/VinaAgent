@@ -1,6 +1,7 @@
 ---
 name: skill-authoring
 description: Create or improve reusable agent skills. Use when the user asks to save a workflow, teach the agent a procedure, or when a repeated task deserves its own skill.
+triggers: [skill, kemampuan, workflow, alur kerja, prosedur]
 ---
 
 # Skill Authoring

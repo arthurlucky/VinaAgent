@@ -1,6 +1,7 @@
 ---
 name: research-report
 description: Produce a sourced research brief on any topic. Use when the user asks for research, a comparison, a market or technology landscape, or a summary that needs citations.
+triggers: [riset, laporan, research, report, analisis, perbandingan, comparison]
 ---
 
 # Research Report

@@ -4,11 +4,17 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:path/path.dart' as p;
+import 'package:pocketstrike/app/router.dart';
 import 'package:pocketstrike/app/theme/glass_tokens.dart';
 import 'package:pocketstrike/core/models/chat_models.dart';
+import 'package:pocketstrike/features/chat/domain/slash_command.dart';
+import 'package:pocketstrike/features/conversations/application/conversations_controller.dart';
 import 'package:pocketstrike/features/local_models/data/local_model_info.dart';
 import 'package:pocketstrike/features/local_models/data/local_model_store.dart';
+import 'package:pocketstrike/features/skills/application/skills_controller.dart';
+import 'package:pocketstrike/features/skills/ui/skill_marketplace_screen.dart';
 import 'package:pocketstrike/shared/widgets/app_icons.dart';
 import 'package:pocketstrike/features/chat/application/chat_controller.dart';
 
@@ -95,7 +101,7 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
     }
   }
 
-  void _send() {
+  Future<void> _send() async {
     if (_isListening) {
       setState(() => _isListening = false);
       _listeningTimer?.cancel();
@@ -106,6 +112,16 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
 
     var textToSend = _textController.text.trim();
     if (textToSend.isEmpty && _attachments.isEmpty) return;
+
+    if (textToSend.startsWith('/')) {
+      final handled = await _runSlashCommand(textToSend);
+      if (handled) {
+        _textController.clear();
+        setState(() {});
+        _focusNode.requestFocus();
+        return;
+      }
+    }
 
     if (isLocalImage &&
         !textToSend.toLowerCase().startsWith('/image') &&
@@ -122,10 +138,222 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
     chat.sendMessage(
       text: textToSend,
       attachments: List.unmodifiable(_attachments),
+      activeSkillName: _pendingSkill,
     );
     _textController.clear();
-    setState(_attachments.clear);
+    setState(() {
+      _attachments.clear();
+      _pendingSkill = null;
+    });
     _focusNode.requestFocus();
+  }
+
+  /// Executes a built-in slash command. Returns true when it was handled.
+  Future<bool> _runSlashCommand(String input) async {
+    final trimmed = input.trim();
+    final parts = trimmed.split(RegExp(r'\s+'));
+    final name = parts.first.substring(1).toLowerCase();
+    final rest = trimmed.substring(parts.first.length).trim();
+
+    switch (name) {
+      case 'help':
+        await _showCommands();
+        return true;
+      case 'skills':
+        await _showSkills();
+        return true;
+      case 'skill':
+        if (rest.isEmpty) {
+          await _showSkills();
+          return true;
+        }
+        final skillParts = rest.split(RegExp(r'\s+'));
+        final skillName = skillParts.first;
+        final prompt = rest.substring(skillName.length).trim();
+        if (prompt.isEmpty) {
+          setState(() => _pendingSkill = skillName);
+          _snack('Skill "$skillName" will be used for your next message.');
+          return true;
+        }
+        HapticFeedback.lightImpact();
+        unawaited(
+          ref.read(chatControllerProvider.notifier).sendMessage(
+                text: prompt,
+                attachments: List.unmodifiable(_attachments),
+                activeSkillName: skillName,
+              ),
+        );
+        if (mounted) setState(_attachments.clear);
+        return true;
+      case 'agent':
+        ref.read(chatControllerProvider.notifier).toggleAgentMode(true);
+        _snack('Agent mode enabled — tools and skills are available.');
+        return true;
+      case 'chat':
+        ref.read(chatControllerProvider.notifier).setChatMode(ChatMode.chat);
+        _snack('Plain chat mode enabled.');
+        return true;
+      case 'local':
+        ref.read(chatControllerProvider.notifier).toggleLocalMode(true);
+        _snack('Local model mode enabled.');
+        return true;
+      case 'marketplace':
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => const SkillMarketplaceScreen(),
+          ),
+        );
+        return true;
+      case 'model':
+        context.push(AppRoutes.settingsModels);
+        return true;
+      case 'mcp':
+        context.push(AppRoutes.settingsMcp);
+        return true;
+      case 'new':
+        final id = await ref
+            .read(conversationActionsProvider)
+            .createConversation();
+        ref.read(currentConversationIdProvider.notifier).state = id;
+        if (mounted) context.go('${AppRoutes.chat}/$id');
+        return true;
+      case 'image':
+      case 'img':
+        return false; // Handled by ChatController's image pipeline.
+      default:
+        _snack('Unknown command "/$name". Type /help for the list.');
+        return true;
+    }
+  }
+
+  void _snack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
+    );
+  }
+
+  Future<void> _showCommands() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Slash commands',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              for (final command in kSlashCommands)
+                ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    command.usage,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(command.description),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _insertCommand(command.name);
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showSkills() async {
+    final skills = await ref.read(skillsProvider.future);
+    if (!mounted) return;
+    if (skills.isEmpty) {
+      _snack('No skills installed yet. Use /marketplace to install one.');
+      return;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Installed skills',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    for (final skill in skills)
+                      ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          skill.enabled
+                              ? Icons.extension_outlined
+                              : Icons.extension_off_outlined,
+                          size: 20,
+                        ),
+                        title: Text(skill.name),
+                        subtitle: Text(
+                          skill.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        enabled: skill.enabled,
+                        onTap: skill.enabled
+                            ? () {
+                                Navigator.pop(sheetContext);
+                                _insertCommand('skill ${skill.name}');
+                              }
+                            : null,
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _insertCommand(String command) {
+    final text = '/$command ';
+    _textController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    _focusNode.requestFocus();
+    setState(() {});
+  }
+
+  void _openCommands() {
+    _textController.value = const TextEditingValue(
+      text: '/',
+      selection: TextSelection.collapsed(offset: 1),
+    );
+    _focusNode.requestFocus();
+    setState(() {});
   }
 
   void _showStepsPicker(BuildContext context, int currentSteps, String? modelId) {
@@ -349,6 +577,7 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
     final activeLocal = localStore.activeModel;
     final isLocalImage = chatState.localMode && activeLocal?.type == LocalModelType.imageModel;
     final generating = chatState.isGenerating;
+    final suggestions = slashCommandSuggestions(_textController.text);
 
     final currentSteps = activeLocal?.steps ?? 20;
     final currentRatio = activeLocal?.aspectRatio ?? '1:1';
@@ -456,6 +685,54 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
                 ],
               ),
             ),
+          if (_pendingSkill != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Chip(
+                  avatar: const Icon(Icons.extension, size: 14),
+                  label: Text('Skill: $_pendingSkill'),
+                  deleteIcon: const Icon(Icons.close, size: 14),
+                  onDeleted: () => setState(() => _pendingSkill = null),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ),
+          if (suggestions.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              constraints: const BoxConstraints(maxHeight: 210),
+              decoration: BoxDecoration(
+                color: tokens.glassColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: tokens.glassBorder, width: 0.8),
+              ),
+              child: ListView(
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                children: [
+                  for (final command in suggestions)
+                    ListTile(
+                      dense: true,
+                      title: Text(
+                        command.usage,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      subtitle: Text(
+                        command.description,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                      onTap: () => _insertCommand(command.name),
+                    ),
+                ],
+              ),
+            ),
           if (_attachments.isNotEmpty)
             Align(
               alignment: Alignment.centerLeft,
@@ -483,6 +760,18 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
                 icon: Icon(AppIcons.paperclip,
                     size: 20, color: tokens.textSecondary),
                 onPressed: widget.enabled ? _pickFiles : null,
+              ),
+              IconButton(
+                tooltip: 'Slash commands',
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+                icon: Icon(
+                  Icons.terminal,
+                  size: 19,
+                  color: tokens.textSecondary,
+                ),
+                onPressed: widget.enabled ? _openCommands : null,
               ),
               Expanded(
                 child: TextField(
@@ -514,6 +803,7 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
                     contentPadding: const EdgeInsets.symmetric(
                         horizontal: 4, vertical: 8),
                   ),
+                  onChanged: (_) => setState(() {}),
                   onSubmitted: (_) => _send(),
                 ),
               ),

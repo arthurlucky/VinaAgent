@@ -1,6 +1,7 @@
 ---
 name: code-review
 description: Review Dart and Flutter code for correctness, lifecycle bugs, and style. Use when the user shares a diff, a file, or asks for a review before merging.
+triggers: [review, kode, code, bug, refactor, periksa kode]
 ---
 
 # Code Review
