@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocketstrike/app/theme/glass_tokens.dart';
 import 'package:pocketstrike/features/skills/application/skills_controller.dart';
 import 'package:pocketstrike/features/skills/domain/agent_skill.dart';
+import 'package:pocketstrike/features/skills/ui/skill_marketplace_screen.dart';
 
 /// Manage the progressive-disclosure skill library installed on the device.
 class SkillsScreen extends ConsumerWidget {
@@ -25,6 +26,17 @@ class SkillsScreen extends ConsumerWidget {
           'Agent Skills',
           style: Theme.of(context).textTheme.titleMedium,
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Skill marketplace',
+            icon: const Icon(Icons.storefront_outlined),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const SkillMarketplaceScreen(),
+              ),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreateDialog(context, ref),

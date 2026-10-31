@@ -27,6 +27,7 @@ class SkillStore {
   static const String _enabledPrefix = 'skill_enabled_';
   static const String _globalEnabledKey = 'skills_enabled';
   static const String _bundledMarker = '.bundled';
+  static const String _marketplaceMarker = '.marketplace';
   static const int _maxResourceChars = 16000;
   static final RegExp _validName = RegExp(r'^[a-z0-9][a-z0-9-]{0,63}$');
 
@@ -146,7 +147,11 @@ class SkillStore {
       final canonical = p.canonicalize(entity.path);
       if (!canonical.startsWith('$base${p.separator}')) continue;
       final relative = p.relative(canonical, from: base).replaceAll('\\', '/');
-      if (relative == 'SKILL.md' || relative == _bundledMarker) continue;
+      if (relative == 'SKILL.md' ||
+          relative == _bundledMarker ||
+          relative == _marketplaceMarker) {
+        continue;
+      }
       resources.add(relative);
     }
 
@@ -231,6 +236,65 @@ class SkillStore {
     final skill = await _readSkill(dir);
     if (skill == null) {
       throw SkillFormatException('Could not read the new skill back from disk.');
+    }
+    return skill;
+  }
+
+  /// Installs a skill downloaded from the marketplace.
+  ///
+  /// [files] maps paths relative to the skill folder and must include
+  /// `SKILL.md`. Existing skills are never overwritten.
+  Future<AgentSkill> installSkill({
+    required String name,
+    required Map<String, String> files,
+    Map<String, String> metadata = const {},
+  }) async {
+    final normalized = _normalizeName(name);
+    if (!_validName.hasMatch(normalized)) {
+      throw SkillFormatException('Invalid skill name "$name".');
+    }
+    if (!files.containsKey('SKILL.md')) {
+      throw SkillFormatException('The downloaded skill has no SKILL.md.');
+    }
+
+    final root = await _root();
+    final dir = Directory(p.join(root.path, normalized));
+    if (await dir.exists()) {
+      throw SkillFormatException(
+        'A skill named "$normalized" already exists. Delete it first to reinstall.',
+      );
+    }
+    await dir.create(recursive: true);
+
+    final base = p.canonicalize(dir.path);
+    for (final entry in files.entries) {
+      final relative = p.normalize(entry.key).replaceAll('\\', '/');
+      if (relative.isEmpty ||
+          relative.startsWith('..') ||
+          p.isAbsolute(relative)) {
+        continue;
+      }
+      final target = File(p.join(base, relative));
+      if (!p.canonicalize(target.path).startsWith('$base${p.separator}')) {
+        continue;
+      }
+      await target.parent.create(recursive: true);
+      await target.writeAsString(entry.value, flush: true);
+    }
+
+    await File(p.join(dir.path, _marketplaceMarker)).writeAsString(
+      jsonEncode({
+        'source': metadata['source'] ?? '',
+        'directory': metadata['directory'] ?? '',
+        'url': metadata['url'] ?? '',
+        'installedAt': DateTime.now().toIso8601String(),
+      }),
+      flush: true,
+    );
+
+    final skill = await _readSkill(dir);
+    if (skill == null) {
+      throw SkillFormatException('Could not read the installed skill.');
     }
     return skill;
   }

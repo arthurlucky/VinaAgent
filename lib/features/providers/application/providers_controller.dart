@@ -15,6 +15,7 @@ import '../../agent/domain/agent_tool.dart';
 import '../../conversations/application/conversations_controller.dart';
 import '../../mcp/application/mcp_controller.dart';
 import '../../mcp/data/mcp_connection_manager.dart';
+import '../../skills/application/marketplace_controller.dart';
 import '../../skills/application/skills_controller.dart';
 import '../../skills/data/skill_tools.dart';
 import '../data/mock_provider.dart';
@@ -94,7 +95,10 @@ class ProviderResolver {
       ...hermesTools,
       ...cronTools,
       ...BuiltInTools.all(),
-      ...SkillTools.all(store: skillStore),
+      ...SkillTools.all(
+        store: skillStore,
+        marketplace: _ref.read(marketplaceClientProvider),
+      ),
       ...manager.toolsForServers(activeIds),
     ];
   }

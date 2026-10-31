@@ -47,6 +47,45 @@ never overwritten.
 | `load_skill` | Load the full instructions for one skill |
 | `read_skill_resource` | Read a bundled reference file |
 | `create_skill` | Persist a new skill created by the agent |
+| `search_skill_marketplace` | Search public GitHub skill repositories |
+| `install_marketplace_skill` | Download and install a marketplace skill |
+
+## Skill marketplace
+
+`Settings > Agent Skills > storefront icon` opens the marketplace.
+
+The catalog is read directly from the public GitHub repositories that power
+skills.sh and ClawHub (`npx skills add owner/repo`), so no API key is needed:
+
+- `anthropics/skills` — official Agent Skills examples
+- `vercel-labs/skills` — find-skills and web workflows
+- `obra/superpowers` — brainstorming, TDD, debugging, planning
+- `mattpocock/skills` — TypeScript, code review, refactoring
+- `microsoft/azure-skills` — Azure diagnostics, cost, RBAC
+- `supabase/agent-skills`, `prisma/skills`, `remotion-dev/skills`,
+  `emilkowalski/skills`
+
+How it works:
+
+1. `GET /repos/{owner}/{repo}` resolves the default branch.
+2. `GET /repos/{owner}/{repo}/git/trees/{branch}?recursive=1` lists every
+   `SKILL.md` in the repository, whatever the folder layout.
+3. `raw.githubusercontent.com` downloads the skill folder (text files only,
+   max 40 files / 4 MB per skill).
+4. `SkillStore.installSkill` writes the files under
+   `<app documents>/skills/<name>/` plus a `.marketplace` metadata marker.
+
+Users can add any `owner/repo` from the marketplace screen; the list is stored
+in `SharedPreferences` under `marketplace_custom_sources`.
+
+### Why not the marketplace APIs directly?
+
+- **skills.sh** requires a Vercel OIDC bearer token (`401` otherwise), which a
+  mobile app cannot mint.
+- **ClawHub** has no stable public REST API yet.
+
+Both index the same GitHub repositories, so installing from the upstream repo
+gives the same skills with no key and no proxy.
 
 ## Settings UI
 

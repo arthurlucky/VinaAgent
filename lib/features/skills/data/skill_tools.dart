@@ -1,4 +1,5 @@
 import '../../agent/domain/agent_tool.dart';
+import 'github_marketplace_client.dart';
 import 'skill_store.dart';
 
 /// Agent tools that expose the skill library.
@@ -9,11 +10,19 @@ import 'skill_store.dart';
 class SkillTools {
   const SkillTools._();
 
-  static List<AgentTool> all({required SkillStore store}) => [
+  static List<AgentTool> all({
+    required SkillStore store,
+    GithubMarketplaceClient? marketplace,
+  }) =>
+      [
         listSkills(store),
         loadSkill(store),
         readSkillResource(store),
         createSkill(store),
+        if (marketplace != null) ...[
+          searchMarketplace(marketplace),
+          installMarketplaceSkill(marketplace, store),
+        ],
       ];
 
   static AgentTool listSkills(SkillStore store) => AgentTool(
@@ -182,6 +191,94 @@ class SkillTools {
                 'model on future runs.';
           } catch (error) {
             return 'Error creating skill: $error';
+          }
+        },
+      );
+
+  static AgentTool searchMarketplace(GithubMarketplaceClient client) =>
+      AgentTool(
+        name: 'search_skill_marketplace',
+        description:
+            'Searches the public skill marketplace (GitHub repositories such as '
+            'anthropics/skills, obra/superpowers and vercel-labs/skills) for '
+            'installable skills. Use when the user wants a new capability or '
+            'asks what can be installed.',
+        inputSchema: const {
+          'type': 'object',
+          'properties': {
+            'query': {
+              'type': 'string',
+              'description': 'Search words, e.g. "pdf" or "code review".',
+            },
+          },
+          'required': ['query'],
+        },
+        risk: ToolRisk.external,
+        run: (args) async {
+          final query = (args['query'] as String? ?? '').trim();
+          if (query.isEmpty) return 'Error: "query" is required.';
+
+          try {
+            final results = await client.search(query, limit: 15);
+            if (results.isEmpty) {
+              return 'No marketplace skills match "$query".';
+            }
+
+            final buffer = StringBuffer('Marketplace results for "$query":\n');
+            for (final skill in results) {
+              buffer.writeln(
+                '- ${skill.name} [${skill.source.id} / ${skill.slug}] '
+                '— ${skill.description}',
+              );
+            }
+            buffer.writeln(
+              '\nInstall one with install_marketplace_skill (source + slug).',
+            );
+            return buffer.toString().trim();
+          } catch (error) {
+            return 'Marketplace search failed: $error';
+          }
+        },
+      );
+
+  static AgentTool installMarketplaceSkill(
+    GithubMarketplaceClient client,
+    SkillStore store,
+  ) =>
+      AgentTool(
+        name: 'install_marketplace_skill',
+        description:
+            'Downloads a skill from the public marketplace and installs it on '
+            'this device. Get source and slug from search_skill_marketplace '
+            'first. Installed skills become available to load_skill.',
+        inputSchema: const {
+          'type': 'object',
+          'properties': {
+            'source': {
+              'type': 'string',
+              'description': 'Repository, e.g. "anthropics/skills".',
+            },
+            'slug': {
+              'type': 'string',
+              'description': 'Skill slug, e.g. "pdf".',
+            },
+          },
+          'required': ['source', 'slug'],
+        },
+        risk: ToolRisk.destructive,
+        run: (args) async {
+          final source = (args['source'] as String? ?? '').trim();
+          final slug = (args['slug'] as String? ?? '').trim();
+          if (source.isEmpty || slug.isEmpty) {
+            return 'Error: both "source" and "slug" are required.';
+          }
+
+          try {
+            final skill = await client.installBySlug(source, slug, store);
+            return 'Installed "${skill.name}" from $source. '
+                'It is now available to load_skill.';
+          } catch (error) {
+            return 'Install failed: $error';
           }
         },
       );
