@@ -18,6 +18,7 @@ import 'package:pocketstrike/features/providers/application/providers_controller
 import 'package:pocketstrike/features/providers/data/mock_provider.dart';
 import 'package:pocketstrike/features/providers/domain/ai_provider.dart';
 import 'package:pocketstrike/features/providers/domain/provider_types.dart';
+import 'package:pocketstrike/features/skills/application/skills_controller.dart';
 import 'package:pocketstrike/shared/widgets/confirm_action_sheet.dart';
 import 'package:uuid/uuid.dart';
 
@@ -784,6 +785,13 @@ class ChatController extends StateNotifier<ChatState> {
       systemPrompt = systemPrompt.isEmpty
           ? agentImageInstruction
           : '$systemPrompt\n\n$agentImageInstruction';
+
+      final skillCatalog = await ref.read(skillCatalogProvider.future);
+      if (skillCatalog.isNotEmpty) {
+        systemPrompt = systemPrompt.isEmpty
+            ? skillCatalog
+            : '$systemPrompt\n\n$skillCatalog';
+      }
     }
 
     if (systemPrompt.isNotEmpty) {

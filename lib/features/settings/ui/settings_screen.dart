@@ -102,6 +102,12 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: 'Filesystem, web search, calculator, code sandbox',
             onTap: () => context.push('/settings/tools'),
           ),
+          _SettingsTile(
+            icon: Icons.auto_awesome,
+            title: 'Agent Skills',
+            subtitle: 'Progressive-disclosure SKILL.md packages loaded on demand',
+            onTap: () => context.push(AppRoutes.settingsSkills),
+          ),
 
           const SizedBox(height: 12),
           const _SectionHeader(title: 'INTEGRATIONS & STORAGE'),

@@ -15,6 +15,8 @@ import '../../agent/domain/agent_tool.dart';
 import '../../conversations/application/conversations_controller.dart';
 import '../../mcp/application/mcp_controller.dart';
 import '../../mcp/data/mcp_connection_manager.dart';
+import '../../skills/application/skills_controller.dart';
+import '../../skills/data/skill_tools.dart';
 import '../data/mock_provider.dart';
 import '../data/provider_registry.dart';
 import '../domain/ai_provider.dart';
@@ -85,10 +87,14 @@ class ProviderResolver {
     final hermesTools = _ref.read(hermesMemoryProvider.notifier).buildTools();
     final cronTools = _ref.read(cronTaskProvider.notifier).buildTools();
 
+    final skillStore = _ref.read(skillStoreProvider);
+    await skillStore.ensureSeeded();
+
     return [
       ...hermesTools,
       ...cronTools,
       ...BuiltInTools.all(),
+      ...SkillTools.all(store: skillStore),
       ...manager.toolsForServers(activeIds),
     ];
   }

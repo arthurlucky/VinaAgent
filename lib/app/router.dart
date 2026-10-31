@@ -20,6 +20,7 @@ import 'package:pocketstrike/features/settings/ui/settings_screen.dart';
 import 'package:pocketstrike/features/gallery/ui/gallery_screen.dart';
 import 'package:pocketstrike/features/settings/ui/storage_settings_screen.dart';
 import 'package:pocketstrike/features/settings/ui/telegram_settings_screen.dart';
+import 'package:pocketstrike/features/skills/ui/skills_screen.dart';
 
 /// App routes.
 abstract class AppRoutes {
@@ -40,6 +41,7 @@ abstract class AppRoutes {
   static const settingsMemory = '/settings/memory';
   static const settingsHermes = '/settings/hermes';
   static const settingsTasks = '/settings/tasks';
+  static const settingsSkills = '/settings/skills';
   static const settingsAbout = '/settings/about';
   static const agentRun = '/agent-run';
 }
@@ -132,6 +134,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.settingsTasks,
         builder: (context, state) => const CronTasksScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.settingsSkills,
+        builder: (context, state) => const SkillsScreen(),
       ),
       GoRoute(
         path: AppRoutes.settingsAbout,
