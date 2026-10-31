@@ -3,6 +3,8 @@ name: Build APK
 on:
   push:
     branches: [main]
+    tags:
+      - 'v*'
     paths-ignore:
       - '**.md'
       - 'docs/**'
@@ -58,7 +60,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: pocketstrike-release-apk
+          name: pocketstrike-release-apk-${{ github.ref_name }}
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -67,4 +69,6 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          name: PocketStrike ${{ github.ref_name }}
           files: build/app/outputs/flutter-apk/app-release.apk
+          generate_release_notes: true
