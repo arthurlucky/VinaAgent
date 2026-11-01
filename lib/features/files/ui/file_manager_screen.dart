@@ -214,7 +214,7 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
                 ? const Center(child: Text('Archive is empty.'))
                 : ListView.separated(
                     itemCount: entries.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    separatorBuilder: (_, _) => const Divider(height: 1),
                     itemBuilder: (context, i) {
                       final entry = entries[i];
                       return ListTile(

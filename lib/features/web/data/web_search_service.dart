@@ -112,7 +112,9 @@ class WebSearchService {
     required SharedPreferences prefs,
     required SecureKeyStore keys,
     Dio? dio,
-  })  : _prefs = prefs,
+  })  // ignore: prefer_initializing_formals
+      : _prefs = prefs,
+        // ignore: prefer_initializing_formals
         _keys = keys,
         _dio = dio ??
             Dio(BaseOptions(

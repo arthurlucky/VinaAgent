@@ -855,7 +855,7 @@ class _AttachmentChips extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                       child: Image.file(
                         file,
-                        maxHeight: 260,
+                        height: 260,
                         fit: BoxFit.contain,
                       ),
                     ),
