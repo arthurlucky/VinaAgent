@@ -140,7 +140,7 @@ class _ConnectMcpSheetState extends ConsumerState<ConnectMcpSheet> {
         if (_oauthProvider == 'notion') {
           headers['Notion-Version'] = '2022-06-28';
         } else if (_oauthProvider == 'github') {
-          headers['User-Agent'] = 'PocketStrike-MCP';
+          headers['User-Agent'] = 'VinaAgent-MCP';
         }
       }
     }
@@ -960,7 +960,7 @@ class _ConnectMcpSheetState extends ConsumerState<ConnectMcpSheet> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        '💡 Paste either the direct access token or the full redirect URL — PocketStrike auto-extracts the token and stores it with AES-GCM encryption in Android Keystore.',
+                        '💡 Paste either the direct access token or the full redirect URL — Vina Agent auto-extracts the token and stores it with AES-GCM encryption in Android Keystore.',
                         style: theme.textTheme.bodySmall?.copyWith(
                           fontSize: 10,
                           color: tokens.textSecondary,

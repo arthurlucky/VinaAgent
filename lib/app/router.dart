@@ -56,16 +56,17 @@ abstract class AppRoutes {
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
+  final onboardingDone = prefs.getBool('onboarding_done') ?? false;
 
   return GoRouter(
-    initialLocation: AppRoutes.splash,
+    initialLocation: onboardingDone ? AppRoutes.chat : AppRoutes.splash,
     redirect: (context, state) {
-      final onboardingDone = prefs.getBool('onboarding_done') ?? false;
+      final isDone = prefs.getBool('onboarding_done') ?? false;
       final onSplash = state.matchedLocation == AppRoutes.splash;
-      if (!onboardingDone && state.matchedLocation != AppRoutes.onboarding) {
+      if (!isDone && state.matchedLocation != AppRoutes.onboarding) {
         return AppRoutes.onboarding;
       }
-      if (onboardingDone && onSplash) return AppRoutes.chat;
+      if (isDone && onSplash) return AppRoutes.chat;
       return null;
     },
     routes: [

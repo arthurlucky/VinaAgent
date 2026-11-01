@@ -435,7 +435,7 @@ class _InteractiveImageCard extends StatelessWidget {
         bytes = Uint8List.fromList(response.data!);
       }
 
-      final fileName = 'PocketStrike_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final fileName = 'VinaAgent_${DateTime.now().millisecondsSinceEpoch}.jpg';
       bool savedNative = false;
 
       // 1. Android Native MediaStore save (instantly visible in Gallery / Google Photos)
@@ -456,8 +456,8 @@ class _InteractiveImageCard extends StatelessWidget {
 
       // 2. Physical File backup in standard media directories
       final candidateDirs = [
-        Directory('/storage/emulated/0/Pictures/PocketStrike'),
-        Directory('/storage/emulated/0/DCIM/PocketStrike'),
+        Directory('/storage/emulated/0/Pictures/VinaAgent'),
+        Directory('/storage/emulated/0/DCIM/VinaAgent'),
         Directory('/storage/emulated/0/Download'),
       ];
 
@@ -509,7 +509,7 @@ class _InteractiveImageCard extends StatelessWidget {
                       ),
                       SizedBox(height: 2),
                       Text(
-                        'Album: Pictures / PocketStrike',
+                        'Album: Pictures / VinaAgent',
                         style: TextStyle(fontSize: 11, color: Colors.white70),
                       ),
                     ],
@@ -543,7 +543,7 @@ class _InteractiveImageCard extends StatelessWidget {
         const channel = MethodChannel('com.pocketstrike.app/gallery');
         await channel.invokeMethod('shareImage', {
           'filePath': file.absolute.path,
-          'text': 'Created with PocketStrike AI',
+          'text': 'Created with Vina Agent AI',
         });
       }
     } catch (e) {

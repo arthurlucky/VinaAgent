@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import '../../../core/models/chat_models.dart';
 import '../domain/ai_provider.dart';
 import '../domain/provider_types.dart';
+import 'multimodal_helper.dart';
 import 'sse_parser.dart';
 
 /// Anthropic Messages API client (SSE streaming, tool_use blocks).
@@ -178,7 +179,29 @@ class AnthropicProvider implements AIProvider {
         case MessageRole.system:
           break; // hoisted above
         case MessageRole.user:
-          out.add({'role': 'user', 'content': m.content});
+          final imageAttachments =
+              MultimodalHelper.extractImageAttachments(m.attachments);
+          if (imageAttachments.isEmpty) {
+            out.add({'role': 'user', 'content': m.content});
+          } else {
+            final contentBlocks = <Map<String, dynamic>>[];
+            for (final img in imageAttachments) {
+              contentBlocks.add({
+                'type': 'image',
+                'source': {
+                  'type': 'base64',
+                  'media_type': img.mimeType,
+                  'data': img.base64Data,
+                },
+              });
+            }
+            if (m.content.isNotEmpty) {
+              contentBlocks.add({'type': 'text', 'text': m.content});
+            } else {
+              contentBlocks.add({'type': 'text', 'text': 'Describe this image.'});
+            }
+            out.add({'role': 'user', 'content': contentBlocks});
+          }
         case MessageRole.assistant:
           out.add({
             'role': 'assistant',

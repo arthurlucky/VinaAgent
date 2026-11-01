@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 
 import '../../../app/theme/glass_tokens.dart';
 import '../../agent/application/agent_workdir_controller.dart';
+import '../../process/ui/task_manager_sheet.dart';
 import '../application/file_manager_controller.dart';
 import '../domain/file_item.dart';
 
@@ -535,6 +536,11 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
               ),
         ),
         actions: [
+          IconButton(
+            tooltip: 'Task Manager',
+            icon: const Icon(Icons.memory_rounded),
+            onPressed: () => showTaskManagerSheet(context),
+          ),
           IconButton(
             tooltip: 'New file',
             icon: const Icon(Icons.note_add_outlined),

@@ -1,6 +1,6 @@
 # Agent Skills
 
-PocketStrike ships a progressive-disclosure skill system modelled on
+Vina Agent ships a progressive-disclosure skill system modelled on
 [Anthropic Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview).
 
 A skill is a folder containing a `SKILL.md` file with YAML frontmatter:

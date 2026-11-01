@@ -49,6 +49,11 @@ const List<SlashCommand> kSlashCommands = [
     name: 'files',
     description: 'Open sandbox File Manager',
   ),
+  SlashCommand(
+    name: 'tasks',
+    description: 'Open Background Process & Task Manager',
+    aliases: ['ps', 'process'],
+  ),
 ];
 
 /// Commands matching what the user has typed so far.

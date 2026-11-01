@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 
 import '../../../core/storage/app_sandbox.dart';
@@ -27,6 +28,7 @@ class StorageAgentTools {
       compressToZip(allowedRoots, activeWorkdir),
       extractZip(allowedRoots, activeWorkdir),
       sendFileAttachment(allowedRoots, activeWorkdir),
+      analyzeImage(allowedRoots, activeWorkdir),
       getWorkdir(activeWorkdir),
     ];
   }
@@ -650,6 +652,59 @@ class StorageAgentTools {
               ? (args['name'] as String).trim()
               : p.basename(file.path);
           return 'ATTACHMENT_SENT: {"name": "$displayName", "path": "${file.path}", "size": ${stat.size}}';
+        },
+      );
+
+  static AgentTool analyzeImage(
+    List<String> allowedRoots, [
+    String activeWorkdir = '',
+  ]) =>
+      AgentTool(
+        name: 'analyze_image',
+        description:
+            'Inspects an image file inside the sandbox and extracts detailed metadata (dimensions, format, file size, color channels, aspect ratio).',
+        inputSchema: const {
+          'type': 'object',
+          'properties': {
+            'path': {
+              'type': 'string',
+              'description':
+                  'Sandbox path of the image to analyze (e.g. "photo.jpg" or "Pictures/screenshot.png").',
+            },
+          },
+          'required': ['path'],
+        },
+        risk: ToolRisk.safe,
+        run: (args) async {
+          final rawPath = args['path'] as String? ?? '';
+          final path = _resolvePath(rawPath, allowedRoots, activeWorkdir);
+          if (!_isAllowed(path, allowedRoots)) {
+            return 'Error: Access denied. Path "$path" is outside allowed root folders.';
+          }
+          final file = File(path);
+          if (!await file.exists()) {
+            return 'Error: Image file "$path" does not exist.';
+          }
+          try {
+            final bytes = await file.readAsBytes();
+            final decoded = img.decodeImage(bytes);
+            if (decoded == null) {
+              return 'Error: Unable to decode image data from "$path". File may be corrupt or unsupported.';
+            }
+            final stat = await file.stat();
+            final aspect = (decoded.width / (decoded.height > 0 ? decoded.height : 1))
+                .toStringAsFixed(2);
+            final kb = (stat.size / 1024).toStringAsFixed(1);
+            return 'Image Analysis for "${p.basename(path)}":\n'
+                '• Resolution: ${decoded.width} x ${decoded.height} px\n'
+                '• Aspect Ratio: $aspect\n'
+                '• File Size: $kb KB (${stat.size} bytes)\n'
+                '• Channels / Bits per Channel: ${decoded.numChannels} / ${decoded.bitsPerChannel}\n'
+                '• Has Alpha (Transparency): ${decoded.hasAlpha}\n'
+                '• Path: ${file.path}';
+          } catch (e) {
+            return 'Error analyzing image: $e';
+          }
         },
       );
 

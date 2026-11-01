@@ -37,7 +37,7 @@ class LocalPromptFormatter {
 
     if (systemPrompt.isEmpty) {
       systemPrompt = fallbackSystemPrompt ??
-          'You are PocketStrike AI, a helpful, intelligent, and direct assistant.';
+          'You are Vina Agent, a helpful, intelligent, and direct assistant.';
     }
 
     // 2. Llama 3 / 3.1 / 3.2 / 3.3
@@ -470,7 +470,7 @@ class LocalAIProvider implements AIProvider {
     final formattedPrompt = LocalPromptFormatter.format(
       messages: request.messages,
       modelNameOrPath: '${model.name} ${model.filePath}',
-      fallbackSystemPrompt: 'You are PocketStrike AI, a helpful, intelligent, and concise assistant.',
+      fallbackSystemPrompt: 'You are Vina Agent, a helpful, intelligent, and concise assistant.',
     );
 
     // Bind cancellation token
@@ -512,7 +512,7 @@ class LocalAIProvider implements AIProvider {
             // Strip any accidental leading role prefix echo or model identifiers
             cleanToken = cleanToken.replaceFirst(
               RegExp(
-                r'^(<\|im_start\|>assistant\s*|<\|start_header_id\|>assistant<\|end_header_id\|>\s*|Assistant:\s*|PocketStrike:\s*|AI:\s*|<start_of_turn>model\s*|model\s*\n*)',
+                r'^(<\|im_start\|>assistant\s*|<\|start_header_id\|>assistant<\|end_header_id\|>\s*|Assistant:\s*|VinaAgent:\s*|Vina Agent:\s*|PocketStrike:\s*|AI:\s*|<start_of_turn>model\s*|model\s*\n*)',
                 caseSensitive: false,
               ),
               '',

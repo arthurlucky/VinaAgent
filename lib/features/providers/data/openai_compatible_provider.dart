@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import '../../../core/models/chat_models.dart';
 import '../domain/ai_provider.dart';
 import '../domain/provider_types.dart';
+import 'multimodal_helper.dart';
 import 'openai_streaming.dart';
 import 'sse_parser.dart';
 
@@ -73,7 +74,27 @@ class OpenAiCompatibleProvider implements AIProvider {
         case MessageRole.system:
           return {'role': 'system', 'content': m.content};
         case MessageRole.user:
-          return {'role': 'user', 'content': m.content};
+          final imageAttachments =
+              MultimodalHelper.extractImageAttachments(m.attachments);
+          if (imageAttachments.isEmpty) {
+            return {'role': 'user', 'content': m.content};
+          }
+          final contentBlocks = <Map<String, dynamic>>[];
+          if (m.content.isNotEmpty) {
+            contentBlocks.add({'type': 'text', 'text': m.content});
+          }
+          for (final img in imageAttachments) {
+            contentBlocks.add({
+              'type': 'image_url',
+              'image_url': {
+                'url': img.dataUri,
+              },
+            });
+          }
+          if (contentBlocks.isEmpty) {
+            contentBlocks.add({'type': 'text', 'text': 'Describe this image.'});
+          }
+          return {'role': 'user', 'content': contentBlocks};
         case MessageRole.assistant:
           return {
             'role': 'assistant',

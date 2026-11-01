@@ -13,8 +13,8 @@ Future<void> initializeBackgroundRelayService() async {
 
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
     kTelegramBackgroundChannelId,
-    'PocketStrike 24/7 Background Relay',
-    description: 'Keeps PocketStrike AI Agent connected to Telegram in the background',
+    'Vina Agent 24/7 Background Relay',
+    description: 'Keeps Vina Agent connected to Telegram in the background',
     importance: Importance.low,
   );
 
@@ -32,7 +32,7 @@ Future<void> initializeBackgroundRelayService() async {
       autoStart: false,
       isForegroundMode: true,
       notificationChannelId: kTelegramBackgroundChannelId,
-      initialNotificationTitle: '⚡ PocketStrike Agent Online',
+      initialNotificationTitle: '⚡ Vina Agent Online',
       initialNotificationContent: '24/7 Telegram AI Relay Active',
       foregroundServiceNotificationId: kTelegramNotificationId,
       foregroundServiceTypes: [
@@ -64,7 +64,7 @@ void onBackgroundServiceStart(ServiceInstance service) async {
         final timeStr =
             '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
         service.setForegroundNotificationInfo(
-          title: '⚡ PocketStrike AI Agent',
+          title: '⚡ Vina Agent',
           content: '24/7 Telegram Relay Active • Last ping $timeStr',
         );
       }

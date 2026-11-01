@@ -102,7 +102,7 @@ class MockProvider implements AIProvider {
   }
 
   static const _cannedReply = '''
-I'm the **PocketStrike demo provider** — running fully offline.
+I'm the **Vina Agent demo provider** — running fully offline.
 
 Here's what I can render:
 
@@ -112,7 +112,7 @@ Here's what I can render:
 
 ```dart
 void main() {
-  print('Hello from PocketStrike!');
+  print('Hello from Vina Agent!');
 }
 ```
 

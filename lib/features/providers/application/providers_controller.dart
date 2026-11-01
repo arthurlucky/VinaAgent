@@ -22,6 +22,7 @@ import '../../artifacts/data/artifact_tools.dart';
 import '../../conversations/application/conversations_controller.dart';
 import '../../mcp/application/mcp_controller.dart';
 import '../../mcp/data/mcp_connection_manager.dart';
+import '../../process/data/process_manager_service.dart';
 import '../../skills/application/marketplace_controller.dart';
 import '../../skills/application/skills_controller.dart';
 import '../../skills/data/skill_tools.dart';
@@ -113,6 +114,7 @@ class ProviderResolver {
         allowedRoots: sandboxRoots,
         activeWorkdir: _ref.read(agentWorkdirProvider),
         webSearch: _ref.read(webSearchServiceProvider),
+        processManager: _ref.read(processManagerProvider),
       ),
       ...SkillTools.all(
         store: skillStore,

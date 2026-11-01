@@ -1,12 +1,14 @@
 import 'dart:math' as math;
 
+import '../../process/data/process_agent_tools.dart';
+import '../../process/data/process_manager_service.dart';
+import '../../web/data/web_search_service.dart';
 import '../domain/agent_tool.dart';
 import 'android_automation_tools.dart';
 import 'device_tools.dart';
 import 'document_tools.dart';
 import 'extra_agent_tools.dart';
 import 'storage_tools.dart';
-import '../../web/data/web_search_service.dart';
 
 /// Safe built-in tools available to the agent out of the box.
 class BuiltInTools {
@@ -16,6 +18,7 @@ class BuiltInTools {
     List<String> allowedRoots = const [],
     String activeWorkdir = '',
     required WebSearchService webSearch,
+    ProcessManagerService? processManager,
   }) => [
         currentTime(),
         calculator(),
@@ -27,6 +30,12 @@ class BuiltInTools {
           activeWorkdir: activeWorkdir,
         ),
         ...ExtraAgentTools.all(webSearch: webSearch),
+        if (processManager != null)
+          ...ProcessAgentTools.all(
+            processManager: processManager,
+            allowedRoots: allowedRoots,
+            activeWorkdir: activeWorkdir,
+          ),
       ];
 
   static AgentTool currentTime() => AgentTool(

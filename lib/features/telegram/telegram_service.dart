@@ -118,7 +118,7 @@ class TelegramServiceNotifier extends Notifier<TelegramServiceState> {
 
       state = state.copyWith(
         status: TelegramBridgeStatus.polling,
-        botName: botUser != null ? '@$botUser' : 'PocketStrike Bot',
+        botName: botUser != null ? '@$botUser' : 'Vina Agent Bot',
         allowedChatId: chatId,
         clearLastError: true,
       );
@@ -207,10 +207,10 @@ class TelegramServiceNotifier extends Notifier<TelegramServiceState> {
             await _sendTelegramMessage(
               token,
               chatId,
-              '🔒 **PocketStrike Security Guard**\n\n'
+              '🔒 **Vina Agent Security Guard**\n\n'
               'This bot is currently locked to a specific Allowed Chat ID in the mobile app.\n\n'
               '👉 **Your Chat ID is:** `$chatId`\n\n'
-              'To allow messages from this account, add `$chatId` under **Settings > Telegram Bridge** in your PocketStrike mobile app.',
+              'To allow messages from this account, add `$chatId` under **Settings > Telegram Bridge** in your Vina Agent mobile app.',
             );
           }
           continue;
@@ -240,11 +240,11 @@ class TelegramServiceNotifier extends Notifier<TelegramServiceState> {
       await _sendTelegramMessage(
         token,
         chatId,
-        '👋 **Hello $fromUser! Welcome to PocketStrike AI.**\n\n'
+        '👋 **Hello $fromUser! Welcome to Vina Agent AI.**\n\n'
         'Your phone is now acting as your autonomous remote AI workstation.\n\n'
         '📌 **Your Chat ID:** `$chatId`\n'
         '🤖 **Bot Status:** Online & Connected\n\n'
-        'Send any prompt, task, or question, and PocketStrike will compute the answer directly on your mobile device!',
+        'Send any prompt, task, or question, and Vina Agent will compute the answer directly on your mobile device!',
       );
       return;
     }
@@ -262,7 +262,7 @@ class TelegramServiceNotifier extends Notifier<TelegramServiceState> {
       await _sendTelegramMessage(
         token,
         chatId,
-        '🏓 **Pong!** PocketStrike Mobile Agent is online and connected.',
+        '🏓 **Pong!** Vina Agent Mobile is online and connected.',
       );
       return;
     }
@@ -275,8 +275,8 @@ class TelegramServiceNotifier extends Notifier<TelegramServiceState> {
       await _sendTelegramMessage(
         token,
         chatId,
-        '⚠️ **PocketStrike Error**: No AI Provider configured in the mobile app.\n\n'
-        'Please open PocketStrike on your phone and add an AI provider key (OpenAI, Claude, Gemini, Groq, or Ollama) in **Settings > AI Providers**.',
+        '⚠️ **Vina Agent Error**: No AI Provider configured in the mobile app.\n\n'
+        'Please open Vina Agent on your phone and add an AI provider key (OpenAI, Claude, Gemini, Groq, or Ollama) in **Settings > AI Providers**.',
       );
       return;
     }
@@ -333,7 +333,7 @@ class TelegramServiceNotifier extends Notifier<TelegramServiceState> {
         await _sendTelegramMessage(
           token,
           chatId,
-          '⚡ PocketStrike processed your request.',
+          '⚡ Vina Agent processed your request.',
         );
       }
     } catch (e) {

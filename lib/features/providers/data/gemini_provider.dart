@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import '../../../core/models/chat_models.dart';
 import '../domain/ai_provider.dart';
 import '../domain/provider_types.dart';
+import 'multimodal_helper.dart';
 import 'sse_parser.dart';
 
 /// Google Gemini client (`streamGenerateContent` over SSE).
@@ -147,11 +148,26 @@ class GeminiProvider implements AIProvider {
         case MessageRole.system:
           break;
         case MessageRole.user:
+          final imageAttachments =
+              MultimodalHelper.extractImageAttachments(m.attachments);
+          final parts = <Map<String, dynamic>>[];
+          if (m.content.isNotEmpty) {
+            parts.add({'text': m.content});
+          }
+          for (final img in imageAttachments) {
+            parts.add({
+              'inlineData': {
+                'mimeType': img.mimeType,
+                'data': img.base64Data,
+              },
+            });
+          }
+          if (parts.isEmpty) {
+            parts.add({'text': 'Describe this image.'});
+          }
           out.add({
             'role': 'user',
-            'parts': [
-              {'text': m.content},
-            ],
+            'parts': parts,
           });
         case MessageRole.assistant:
           out.add({

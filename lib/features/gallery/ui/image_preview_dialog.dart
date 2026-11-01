@@ -69,7 +69,7 @@ class _ImagePreviewDialogState extends ConsumerState<ImagePreviewDialog> {
             Expanded(
               child: Text(
                 success
-                    ? 'Saved to Gallery in Pictures/PocketStrike'
+                    ? 'Saved to Gallery in Pictures/VinaAgent'
                     : 'Failed to save image to gallery',
                 style: const TextStyle(fontSize: 13, color: Colors.white),
               ),

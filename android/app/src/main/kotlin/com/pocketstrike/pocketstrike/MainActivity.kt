@@ -22,7 +22,7 @@ class MainActivity : FlutterActivity() {
             when (call.method) {
                 "saveImageToGallery" -> {
                     val bytes = call.argument<ByteArray>("bytes")
-                    val fileName = call.argument<String>("fileName") ?: "PocketStrike_${System.currentTimeMillis()}.jpg"
+                    val fileName = call.argument<String>("fileName") ?: "VinaAgent_${System.currentTimeMillis()}.jpg"
 
                     if (bytes == null || bytes.isEmpty()) {
                         result.error("INVALID_DATA", "Image bytes cannot be empty", null)
@@ -42,7 +42,7 @@ class MainActivity : FlutterActivity() {
                 }
                 "shareImage" -> {
                     val filePath = call.argument<String>("filePath")
-                    val text = call.argument<String>("text") ?: "Created with PocketStrike AI"
+                    val text = call.argument<String>("text") ?: "Created with Vina Agent AI"
                     if (filePath != null) {
                         try {
                             val file = File(filePath)
@@ -135,7 +135,7 @@ class MainActivity : FlutterActivity() {
             put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
             put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/PocketStrike")
+                put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/VinaAgent")
                 put(MediaStore.Images.Media.IS_PENDING, 1)
             }
         }
@@ -164,7 +164,7 @@ class MainActivity : FlutterActivity() {
         }
 
         // Fallback for devices without MediaStore insert access
-        val picturesDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "PocketStrike")
+        val picturesDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "VinaAgent")
         if (!picturesDir.exists()) {
             picturesDir.mkdirs()
         }

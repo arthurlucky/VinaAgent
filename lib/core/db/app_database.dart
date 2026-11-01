@@ -50,7 +50,7 @@ class AppDatabase extends _$AppDatabase {
           id: 'persona_general',
           name: 'General Assistant',
           systemPrompt: const Value(
-            'You are PocketStrike, a precise, friendly AI assistant. '
+            'You are Vina Agent, a precise, friendly AI assistant. '
             'Answer concisely and use markdown when it helps.',
           ),
           icon: const Value('sparkle'),
@@ -60,7 +60,7 @@ class AppDatabase extends _$AppDatabase {
           id: 'persona_coding',
           name: 'Coding Agent',
           systemPrompt: const Value(
-            'You are PocketStrike, an expert software engineer. '
+            'You are Vina Agent, an expert software engineer. '
             'Write correct, idiomatic code with brief explanations. '
             'Prefer complete, runnable snippets.',
           ),
@@ -71,7 +71,7 @@ class AppDatabase extends _$AppDatabase {
           id: 'persona_research',
           name: 'Research Agent',
           systemPrompt: const Value(
-            'You are PocketStrike, a thorough research assistant. '
+            'You are Vina Agent, a thorough research assistant. '
             'Cite reasoning steps, compare options, and flag uncertainty.',
           ),
           icon: const Value('magnifyingGlass'),

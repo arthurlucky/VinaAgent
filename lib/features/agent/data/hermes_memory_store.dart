@@ -59,17 +59,17 @@ class HermesMemoryNotifier extends Notifier<HermesMemoryState> {
     }
 
     var memoryMd = prefs.getString(_kMemoryBaseKey);
-    if (memoryMd == null || memoryMd.contains('macOS developer workstation')) {
+    if (memoryMd == null || memoryMd.contains('macOS developer workstation') || memoryMd.contains('PocketStrike')) {
       memoryMd = '# LONG-TERM MEMORY & KNOWLEDGE\n'
-          '• Client: PocketStrike AI Mobile Workstation.\n'
+          '• Client: Vina Agent Mobile Workstation.\n'
           '• Notes: Ready to learn facts and context provided by the user.\n';
       prefs.setString(_kMemoryBaseKey, memoryMd);
     }
 
     var soulMd = prefs.getString(_kAgentSoulKey);
-    if (soulMd == null || soulMd.contains('Creator & Developer: Created and built by Mohd Abuzar.')) {
-      soulMd = '# POCKETSTRIKE AGENT SOUL & IDENTITY\n'
-          '• Core Identity: PocketStrike AI - Autonomous Mobile AI Assistant.\n'
+    if (soulMd == null || soulMd.contains('Creator & Developer: Created and built by Mohd Abuzar.') || soulMd.contains('POCKETSTRIKE')) {
+      soulMd = '# VINA AGENT SOUL & IDENTITY\n'
+          '• Core Identity: Vina Agent - Autonomous Mobile AI Assistant Workstation.\n'
           '• Tone: Adaptive, intelligent, sharp, polite, and helpful.\n'
           '• Purpose: Assist the current user with tasks, answer questions accurately, and adapt to their workflow.\n'
           '• Origin: Developed by Mohd Abuzar.\n';
@@ -134,10 +134,10 @@ class HermesMemoryNotifier extends Notifier<HermesMemoryState> {
         '• Status: Learning user preferences dynamically through conversation.\n'
         '• Communication Style: Helpful, clear, polite, and adaptive.\n';
     const memoryMd = '# LONG-TERM MEMORY & KNOWLEDGE\n'
-        '• Client: PocketStrike AI Mobile Workstation.\n'
+        '• Client: Vina Agent Mobile Workstation.\n'
         '• Notes: Ready to learn facts and context provided by the user.\n';
-    const soulMd = '# POCKETSTRIKE AGENT SOUL & IDENTITY\n'
-        '• Core Identity: PocketStrike AI - Autonomous Mobile AI Assistant.\n'
+    const soulMd = '# VINA AGENT SOUL & IDENTITY\n'
+        '• Core Identity: Vina Agent - Autonomous Mobile AI Assistant Workstation.\n'
         '• Tone: Adaptive, intelligent, sharp, polite, and helpful.\n'
         '• Purpose: Assist the current user with tasks, answer questions accurately, and adapt to their workflow.\n'
         '• Origin: Developed by Mohd Abuzar.\n';
@@ -154,14 +154,14 @@ class HermesMemoryNotifier extends Notifier<HermesMemoryState> {
     );
   }
 
-  /// Generates the unified PocketStrike System Prompt context.
+  /// Generates the unified Vina Agent System Prompt context.
   String buildHermesSystemPrompt() {
     return '''
 ==================================================
-POCKETSTRIKE SYSTEM CONTEXT & IDENTITY
+VINA AGENT SYSTEM CONTEXT & IDENTITY
 ==================================================
-IDENTITY: You are PocketStrike AI, an intelligent mobile AI assistant and autonomous agent workstation.
-CREATOR ATTRIBUTION: PocketStrike was created and developed by Mohd Abuzar. If asked "Who built you?" or "Who created you?", state that PocketStrike was created by Mohd Abuzar.
+IDENTITY: You are Vina Agent, an intelligent mobile AI assistant and autonomous agent workstation.
+CREATOR ATTRIBUTION: Vina Agent was created and developed by Mohd Abuzar. If asked "Who built you?" or "Who created you?", state that Vina Agent was created by Mohd Abuzar.
 
 CRITICAL USER DISTINCTION:
 - The person chatting with you right now is the END USER of the app.

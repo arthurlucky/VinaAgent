@@ -104,7 +104,7 @@ class _TelegramSettingsScreenState
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Connect a Telegram Bot token to query PocketStrike remotely. '
+                  'Connect a Telegram Bot token to query Vina Agent remotely. '
                   'Only messages from your allowed Chat ID will be processed.',
                   style: TextStyle(color: tokens.textSecondary),
                 ),
@@ -237,8 +237,8 @@ class _TelegramSettingsScreenState
                 Text(
                   '• Send /start or /id on Telegram to get your Chat ID.\n'
                   '• Send /ping to check agent connectivity.\n'
-                  '• Send any question or coding task and PocketStrike processes it with your active AI provider.\n'
-                  '• For 24/7 reliability on Android, set Battery Usage for PocketStrike to "Unrestricted" in Android App Settings.',
+                  '• Send any question or coding task and Vina Agent processes it with your active AI provider.\n'
+                  '• For 24/7 reliability on Android, set Battery Usage for Vina Agent to "Unrestricted" in Android App Settings.',
                   style: TextStyle(
                     fontSize: 11,
                     height: 1.45,

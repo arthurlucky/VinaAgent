@@ -5,6 +5,9 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/db/app_database.dart';
 import '../../../core/db/daos.dart';
+import '../../../core/storage/prefs_provider.dart';
+
+const String _kLastActiveConvKey = 'last_active_conversation_id';
 
 /// Sidebar list: pinned first, then recent.
 final conversationsProvider = StreamProvider<List<Conversation>>((ref) {
@@ -12,8 +15,20 @@ final conversationsProvider = StreamProvider<List<Conversation>>((ref) {
 });
 
 /// The conversation currently open in the chat screen (null = fresh draft).
-final currentConversationIdProvider =
-    StateProvider<String?>((ref) => null);
+final currentConversationIdProvider = StateProvider<String?>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  final initial = prefs.getString(_kLastActiveConvKey);
+
+  ref.listenSelf((previous, next) {
+    if (next == null) {
+      prefs.remove(_kLastActiveConvKey);
+    } else {
+      prefs.setString(_kLastActiveConvKey, next);
+    }
+  });
+
+  return initial;
+});
 
 final currentConversationProvider = StreamProvider<Conversation?>((ref) {
   final id = ref.watch(currentConversationIdProvider);

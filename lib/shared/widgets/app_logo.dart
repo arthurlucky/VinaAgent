@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Inspired Robot Head AI Logo for PocketStrike.
+/// Inspired Robot Head AI Logo for Vina Agent.
 class AppLogo extends StatelessWidget {
   const AppLogo({
     super.key,

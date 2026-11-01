@@ -33,8 +33,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   void _syncConversation() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      ref.read(currentConversationIdProvider.notifier).state =
-          widget.conversationId;
+      if (widget.conversationId != null) {
+        ref.read(currentConversationIdProvider.notifier).state =
+            widget.conversationId;
+      }
     });
   }
 

@@ -42,6 +42,8 @@ class GalleryController extends StateNotifier<AsyncValue<List<GalleryItem>>> {
                   final stat = f.statSync();
                   final fileName = f.uri.pathSegments.last;
                   final isSavedToPhone = File(
+                          '/storage/emulated/0/Pictures/VinaAgent/$fileName')
+                      .existsSync() || File(
                           '/storage/emulated/0/Pictures/PocketStrike/$fileName')
                       .existsSync();
                   items.add(GalleryItem(
@@ -69,7 +71,7 @@ class GalleryController extends StateNotifier<AsyncValue<List<GalleryItem>>> {
     }
   }
 
-  /// Saves the image file into Android MediaStore (Pictures/PocketStrike)
+  /// Saves the image file into Android MediaStore (Pictures/VinaAgent)
   Future<bool> saveToPhoneGallery(GalleryItem item) async {
     try {
       final file = File(item.filePath);
@@ -80,9 +82,9 @@ class GalleryController extends StateNotifier<AsyncValue<List<GalleryItem>>> {
         'saveImageToGallery',
         {
           'bytes': bytes,
-          'fileName': item.fileName.startsWith('PocketStrike_')
+          'fileName': item.fileName.startsWith('VinaAgent_') || item.fileName.startsWith('PocketStrike_')
               ? item.fileName
-              : 'PocketStrike_${DateTime.now().millisecondsSinceEpoch}.jpg',
+              : 'VinaAgent_${DateTime.now().millisecondsSinceEpoch}.jpg',
         },
       );
 
@@ -104,7 +106,7 @@ class GalleryController extends StateNotifier<AsyncValue<List<GalleryItem>>> {
         'shareImage',
         {
           'filePath': item.filePath,
-          'text': caption ?? 'Created with PocketStrike AI',
+          'text': caption ?? 'Created with Vina Agent AI',
         },
       );
       return result ?? false;

@@ -474,7 +474,7 @@ class LocalModelStoreNotifier extends Notifier<LocalModelState> {
             lastNotifUpdate = now;
             notifService.showDownloadProgress(
               id: notifId,
-              title: 'PocketStrike: Downloading ${model.name}',
+              title: 'Vina Agent: Downloading ${model.name}',
               body: statusStr,
               progress: (progress * 100).toInt(),
               maxProgress: 100,

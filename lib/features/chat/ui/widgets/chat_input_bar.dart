@@ -14,6 +14,7 @@ import 'package:pocketstrike/features/chat/domain/slash_command.dart';
 import 'package:pocketstrike/features/conversations/application/conversations_controller.dart';
 import 'package:pocketstrike/features/local_models/data/local_model_info.dart';
 import 'package:pocketstrike/features/local_models/data/local_model_store.dart';
+import 'package:pocketstrike/features/process/ui/task_manager_sheet.dart';
 import 'package:pocketstrike/features/skills/application/skills_controller.dart';
 import 'package:pocketstrike/features/skills/ui/skill_marketplace_screen.dart';
 import 'package:pocketstrike/shared/widgets/app_icons.dart';
@@ -224,6 +225,11 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
         return false; // Handled by ChatController's image pipeline.
       case 'files':
         context.push(AppRoutes.settingsFiles);
+        return true;
+      case 'tasks':
+      case 'ps':
+      case 'process':
+        await showTaskManagerSheet(context);
         return true;
       case 'workdir':
       case 'wd':
