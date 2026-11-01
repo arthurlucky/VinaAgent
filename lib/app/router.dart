@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pocketstrike/core/storage/prefs_provider.dart';
 import 'package:pocketstrike/features/agent/ui/agent_run_screen.dart';
+import 'package:pocketstrike/features/agents/ui/agents_settings_screen.dart';
+import 'package:pocketstrike/features/artifacts/ui/artifacts_screen.dart';
 import 'package:pocketstrike/features/chat/ui/home_shell.dart';
 import 'package:pocketstrike/features/onboarding/onboarding_screen.dart';
 import 'package:pocketstrike/features/onboarding/splash_screen.dart';
@@ -43,6 +45,8 @@ abstract class AppRoutes {
   static const settingsHermes = '/settings/hermes';
   static const settingsTasks = '/settings/tasks';
   static const settingsSkills = '/settings/skills';
+  static const settingsAgents = '/settings/agents';
+  static const settingsArtifacts = '/settings/artifacts';
   static const settingsWebSearch = '/settings/web-search';
   static const settingsAbout = '/settings/about';
   static const agentRun = '/agent-run';
@@ -144,6 +148,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.settingsSkills,
         builder: (context, state) => const SkillsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.settingsAgents,
+        builder: (context, state) => const AgentsSettingsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.settingsArtifacts,
+        builder: (context, state) => const ArtifactsScreen(),
       ),
       GoRoute(
         path: AppRoutes.settingsAbout,

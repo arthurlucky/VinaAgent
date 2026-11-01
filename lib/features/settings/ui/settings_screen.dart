@@ -114,6 +114,18 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: 'Progressive-disclosure SKILL.md packages loaded on demand',
             onTap: () => context.push(AppRoutes.settingsSkills),
           ),
+          _SettingsTile(
+            icon: Icons.groups_2_outlined,
+            title: 'Sub-agents',
+            subtitle: 'Specialists with their own persona, model and tool allowlist',
+            onTap: () => context.push(AppRoutes.settingsAgents),
+          ),
+          _SettingsTile(
+            icon: Icons.inventory_2_outlined,
+            title: 'Artifacts',
+            subtitle: 'Versioned documents, code, HTML and data produced by the agent',
+            onTap: () => context.push(AppRoutes.settingsArtifacts),
+          ),
 
           const SizedBox(height: 12),
           const _SectionHeader(title: 'INTEGRATIONS & STORAGE'),

@@ -13,6 +13,11 @@ import '../../agent/data/built_in_tools.dart';
 import '../../agent/data/cron_task_store.dart';
 import '../../agent/data/hermes_memory_store.dart';
 import '../../agent/domain/agent_tool.dart';
+import '../../agents/application/agents_controller.dart';
+import '../../agents/data/agent_delegate_tool.dart';
+import '../../agents/domain/agent_profile.dart';
+import '../../artifacts/application/artifacts_controller.dart';
+import '../../artifacts/data/artifact_tools.dart';
 import '../../conversations/application/conversations_controller.dart';
 import '../../mcp/application/mcp_controller.dart';
 import '../../mcp/data/mcp_connection_manager.dart';
@@ -62,7 +67,13 @@ class ProviderResolver {
   AIProvider mock() => const MockProvider();
 
   /// Available tools for this conversation's enabled MCP servers + built-in tools.
-  Future<List<AgentTool>> availableTools(String conversationId) async {
+  ///
+  /// [includeDelegates] is false inside a delegated sub-agent, which enforces
+  /// the depth-1 delegation limit.
+  Future<List<AgentTool>> availableTools(
+    String conversationId, {
+    bool includeDelegates = true,
+  }) async {
     final db = _ref.read(appDatabaseProvider);
     final conv = await db.conversationsDao.getById(conversationId);
     final enabledServers = await db.mcpServersDao.getEnabled();
@@ -94,7 +105,7 @@ class ProviderResolver {
     await skillStore.ensureSeeded();
     final sandboxRoots = await AppSandbox.roots();
 
-    return [
+    final tools = <AgentTool>[
       ...hermesTools,
       ...cronTools,
       ...BuiltInTools.all(
@@ -106,8 +117,50 @@ class ProviderResolver {
         marketplace: _ref.read(marketplaceClientProvider),
         skillsMp: _ref.read(skillsMpClientProvider),
       ),
+      ...ArtifactTools.all(store: _ref.read(artifactStoreProvider)),
       ...manager.toolsForServers(activeIds),
     ];
+
+    if (includeDelegates) {
+      final profiles = await _ref.read(agentProfileStoreProvider).list();
+      tools.add(AgentDelegation.build(
+        profiles: profiles,
+        resolveTarget: resolveForProfile,
+        paramsFor: paramsFor,
+        loadTools: () => availableTools(
+          conversationId,
+          includeDelegates: false,
+        ),
+      ));
+    }
+    return tools;
+  }
+
+  /// Resolves a profile's provider + model, falling back to the default
+  /// provider and its first suggested model.
+  Future<DelegateTarget?> resolveForProfile(AgentProfile profile) async {
+    final dao = _ref.read(appDatabaseProvider).providerConfigsDao;
+    ProviderConfig? config;
+    if (profile.providerConfigId.isNotEmpty) {
+      final all = await dao.getAll();
+      config = all
+          .where((c) => c.id == profile.providerConfigId)
+          .firstOrNull;
+    }
+    config ??= await dao.getDefault();
+    if (config == null) return null;
+
+    final key =
+        await _ref.read(secureKeyStoreProvider).readProviderKey(config.id);
+    final provider = ProviderRegistry.build(config, key);
+    if (provider == null) return null;
+
+    var model = profile.model.trim();
+    if (model.isEmpty) model = config.defaultModel.trim();
+    if (model.isEmpty) {
+      model = ProviderTypeX.fromId(config.type).suggestedModels.first;
+    }
+    return (provider: provider, configId: config.id, model: model);
   }
 
   /// Forced MCP confirmations set.
