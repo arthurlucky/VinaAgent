@@ -39,6 +39,16 @@ const List<SlashCommand> kSlashCommands = [
     description: 'Generate an image: /image <prompt>',
     aliases: ['img'],
   ),
+  SlashCommand(
+    name: 'workdir',
+    description:
+        'Set or view agent working directory: /workdir [folder|default]',
+    aliases: ['wd'],
+  ),
+  SlashCommand(
+    name: 'files',
+    description: 'Open sandbox File Manager',
+  ),
 ];
 
 /// Commands matching what the user has typed so far.

@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:pocketstrike/app/router.dart';
 import 'package:pocketstrike/app/theme/app_theme.dart';
 import 'package:pocketstrike/app/theme/glass_tokens.dart';
 import 'package:pocketstrike/core/db/app_database.dart' show Message;
@@ -773,6 +776,154 @@ class _AttachmentChips extends StatelessWidget {
 
   final String json;
 
+  void _openAttachment(BuildContext context, AttachmentMeta a) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final tokens = context.glass;
+        final file = File(a.path);
+        final exists = file.existsSync();
+        String? previewText;
+        if (exists && !a.isImage && !a.path.endsWith('.zip')) {
+          try {
+            previewText = file.readAsStringSync();
+            if (previewText.length > 2000) {
+              previewText =
+                  '${previewText.substring(0, 2000)}\n\n… [content truncated]';
+            }
+          } catch (_) {}
+        }
+
+        return Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      a.isImage
+                          ? AppIcons.image
+                          : (a.path.endsWith('.zip')
+                              ? Icons.folder_zip
+                              : AppIcons.file),
+                      color: tokens.accent,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            a.name,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                          Text(
+                            '${a.sizeBytes != null ? _formatAttachmentSize(a.sizeBytes!) : ''} · ${a.path}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: tokens.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                if (a.isImage && exists)
+                  Center(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.file(
+                        file,
+                        maxHeight: 260,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  )
+                else if (previewText != null && previewText.isNotEmpty)
+                  Container(
+                    width: double.infinity,
+                    constraints: const BoxConstraints(maxHeight: 220),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: tokens.glassColor,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: tokens.glassBorder),
+                    ),
+                    child: SingleChildScrollView(
+                      child: SelectableText(
+                        previewText,
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.copy, size: 16),
+                        label: const Text('Copy Path'),
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: a.path));
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('Path copied to clipboard')),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton.icon(
+                        icon: const Icon(Icons.folder_open, size: 16),
+                        label: const Text('File Manager'),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          context.push(AppRoutes.settingsFiles);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  String _formatAttachmentSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
   @override
   Widget build(BuildContext context) {
     final tokens = context.glass;
@@ -790,23 +941,37 @@ class _AttachmentChips extends StatelessWidget {
       runSpacing: 6,
       children: [
         for (final a in attachments)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
+          Material(
+            color: tokens.glassColor,
+            borderRadius: BorderRadius.circular(tokens.radiusSm),
+            child: InkWell(
               borderRadius: BorderRadius.circular(tokens.radiusSm),
-              border: Border.all(color: tokens.glassBorder),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  a.isImage ? AppIcons.image : AppIcons.file,
-                  size: 13,
-                  color: tokens.textSecondary,
+              onTap: () => _openAttachment(context, a),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(tokens.radiusSm),
+                  border: Border.all(color: tokens.glassBorder),
                 ),
-                const SizedBox(width: 4),
-                Text(a.name, style: Theme.of(context).textTheme.bodySmall),
-              ],
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      a.isImage
+                          ? AppIcons.image
+                          : (a.path.endsWith('.zip')
+                              ? Icons.folder_zip
+                              : AppIcons.file),
+                      size: 13,
+                      color: tokens.accent,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(a.name,
+                        style: Theme.of(context).textTheme.bodySmall),
+                  ],
+                ),
+              ),
             ),
           ),
       ],

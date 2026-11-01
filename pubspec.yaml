@@ -1,7 +1,7 @@
 name: pocketstrike
 description: "Vina Agent — a self-evolving AI agent workstation."
 publish_to: 'none'
-version: 2.4.0+24
+version: 2.4.1+25
 
 environment:
   sdk: ^3.12.2
@@ -34,6 +34,7 @@ dependencies:
   flutter_background_service: ^5.1.0
   llama_flutter_android: ^0.2.6
   image: ^4.9.2
+  archive: ^4.1.0
   url_launcher: ^6.3.2
   yaml: ^3.1.2
 

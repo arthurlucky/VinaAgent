@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:pocketstrike/app/router.dart';
 import 'package:pocketstrike/app/theme/glass_tokens.dart';
 import 'package:pocketstrike/core/models/chat_models.dart';
+import 'package:pocketstrike/features/agent/application/agent_workdir_controller.dart';
 import 'package:pocketstrike/features/chat/domain/slash_command.dart';
 import 'package:pocketstrike/features/conversations/application/conversations_controller.dart';
 import 'package:pocketstrike/features/local_models/data/local_model_info.dart';
@@ -221,9 +222,145 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
       case 'image':
       case 'img':
         return false; // Handled by ChatController's image pipeline.
+      case 'files':
+        context.push(AppRoutes.settingsFiles);
+        return true;
+      case 'workdir':
+      case 'wd':
+        await _handleWorkdirCommand(rest);
+        return true;
       default:
         _snack('Unknown command "/$name". Type /help for the list.');
         return true;
+    }
+  }
+
+  Future<void> _handleWorkdirCommand(String rest) async {
+    final notifier = ref.read(agentWorkdirProvider.notifier);
+    final target = rest.trim();
+
+    if (target.isEmpty) {
+      final current = notifier.displayWorkdir;
+      final folders = await notifier.listAvailableFolders();
+      if (!mounted) return;
+
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) {
+          final tokens = context.glass;
+          return Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.65,
+            ),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Agent Workdir',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                Text(
+                  'Current: $current',
+                  style: TextStyle(
+                    color: tokens.accent,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.home_outlined),
+                  title: const Text('Default Root (root/)'),
+                  subtitle:
+                      const Text('Reset agent workspace to sandbox root'),
+                  onTap: () async {
+                    await notifier.setWorkdir('');
+                    if (context.mounted) Navigator.pop(context);
+                    _snack('Workdir set to default: root/');
+                  },
+                ),
+                const Divider(),
+                Text(
+                  'Available Folders in root:',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: tokens.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: 6),
+                Expanded(
+                  child: folders.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No subfolders found in root.',
+                            style: TextStyle(color: tokens.textSecondary),
+                          ),
+                        )
+                      : ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: folders.length,
+                          itemBuilder: (context, i) {
+                            final f = folders[i];
+                            final isCur = notifier.relativeWorkdir == f;
+                            return ListTile(
+                              dense: true,
+                              leading: Icon(
+                                Icons.folder,
+                                color: isCur ? tokens.accent : null,
+                              ),
+                              title: Text(f),
+                              trailing: isCur
+                                  ? Chip(
+                                      label: const Text('Active',
+                                          style: TextStyle(fontSize: 11)),
+                                      backgroundColor: tokens.accent
+                                          .withValues(alpha: 0.15),
+                                    )
+                                  : null,
+                              onTap: () async {
+                                await notifier.setWorkdir(f);
+                                if (context.mounted) Navigator.pop(context);
+                                _snack('Workdir set to: root/$f');
+                              },
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+      return;
+    }
+
+    if (target == 'default' || target == '/' || target == 'root') {
+      await notifier.setWorkdir('');
+      _snack('Workdir set to default: root/');
+    } else {
+      await notifier.setWorkdir(target);
+      _snack('Workdir set to: root/$target');
     }
   }
 

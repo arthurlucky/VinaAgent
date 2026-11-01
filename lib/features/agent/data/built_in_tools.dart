@@ -14,6 +14,7 @@ class BuiltInTools {
 
   static List<AgentTool> all({
     List<String> allowedRoots = const [],
+    String activeWorkdir = '',
     required WebSearchService webSearch,
   }) => [
         currentTime(),
@@ -21,7 +22,10 @@ class BuiltInTools {
         ...DeviceAgentTools.all(),
         ...AndroidAutomationTools.all(),
         ...DocumentAgentTools.all(allowedRoots: allowedRoots),
-        ...StorageAgentTools.tools(allowedRoots: allowedRoots),
+        ...StorageAgentTools.tools(
+          allowedRoots: allowedRoots,
+          activeWorkdir: activeWorkdir,
+        ),
         ...ExtraAgentTools.all(webSearch: webSearch),
       ];
 

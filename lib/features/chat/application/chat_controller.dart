@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' hide Column;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 import 'package:pocketstrike/app/theme/theme_controller.dart';
 import 'package:pocketstrike/core/db/app_database.dart';
 import 'package:pocketstrike/core/models/chat_models.dart';
+import 'package:pocketstrike/features/agent/application/agent_workdir_controller.dart';
 import 'package:pocketstrike/features/agent/data/agent_engine.dart';
 import 'package:pocketstrike/features/agent/data/hermes_memory_store.dart';
 import 'package:pocketstrike/features/agent/domain/agent_event.dart';
@@ -662,6 +665,9 @@ class ChatController extends StateNotifier<ChatState> {
     }
 
     final toolCallsForMessage = <ToolCallInfo>[];
+    final generatedAttachments = <AttachmentMeta>[];
+    final addedAttachmentPaths = <String>{};
+
     for (int i = 0; i < steps.length; i++) {
       final step = steps[i];
       if (step.type == 'toolCall') {
@@ -682,6 +688,76 @@ class ChatController extends StateNotifier<ChatState> {
             isError: observation?.isError ?? false,
           ),
         );
+
+        if (observation != null && observation.isError != true) {
+          final res = observation.result ?? '';
+          if (res.contains('ATTACHMENT_SENT:')) {
+            try {
+              final jsonStr = res
+                  .substring(res.indexOf('ATTACHMENT_SENT:') +
+                      'ATTACHMENT_SENT:'.length)
+                  .trim();
+              final parsed = jsonDecode(jsonStr) as Map<String, dynamic>;
+              final filePath = parsed['path'] as String;
+              if (!addedAttachmentPaths.contains(filePath)) {
+                addedAttachmentPaths.add(filePath);
+                generatedAttachments.add(
+                  AttachmentMeta(
+                    name: parsed['name'] as String? ?? p.basename(filePath),
+                    path: filePath,
+                    mimeType: _guessMimeType(filePath),
+                    sizeBytes: parsed['size'] as int?,
+                  ),
+                );
+              }
+            } catch (_) {}
+          } else if (step.toolName == 'write_file') {
+            try {
+              final args =
+                  jsonDecode(step.argumentsJson ?? '{}') as Map<String, dynamic>;
+              final rawPath = args['path'] as String? ?? '';
+              final resolvedPath = await ref
+                  .read(agentWorkdirProvider.notifier)
+                  .resolveAgentPath(rawPath);
+              final file = File(resolvedPath);
+              if (await file.exists() &&
+                  !addedAttachmentPaths.contains(file.path)) {
+                final stat = await file.stat();
+                addedAttachmentPaths.add(file.path);
+                generatedAttachments.add(
+                  AttachmentMeta(
+                    name: p.basename(file.path),
+                    path: file.path,
+                    mimeType: _guessMimeType(file.path),
+                    sizeBytes: stat.size,
+                  ),
+                );
+              }
+            } catch (_) {}
+          } else if (step.toolName == 'compress_to_zip') {
+            final match =
+                RegExp(r'Successfully compressed to "([^"]+)"').firstMatch(res);
+            if (match != null) {
+              final zipPath = match.group(1);
+              if (zipPath != null) {
+                final file = File(zipPath);
+                if (await file.exists() &&
+                    !addedAttachmentPaths.contains(file.path)) {
+                  final stat = await file.stat();
+                  addedAttachmentPaths.add(file.path);
+                  generatedAttachments.add(
+                    AttachmentMeta(
+                      name: p.basename(file.path),
+                      path: file.path,
+                      mimeType: 'application/zip',
+                      sizeBytes: stat.size,
+                    ),
+                  );
+                }
+              }
+            }
+          }
+        }
       }
     }
 
@@ -692,6 +768,7 @@ class ChatController extends StateNotifier<ChatState> {
         role: MessageRole.assistant,
         content: contentToPersist,
         toolCalls: toolCallsForMessage,
+        attachments: generatedAttachments,
         tokensPerSecond: finalTps,
         tokenCount: tokenCount > 0 ? tokenCount : null,
         createdAt: DateTime.now(),
@@ -1000,3 +1077,42 @@ final chatControllerProvider =
     StateNotifierProvider<ChatController, ChatState>((ref) {
   return ChatController(ref);
 });
+
+String _guessMimeType(String filePath) {
+  final ext = p.extension(filePath).toLowerCase();
+  switch (ext) {
+    case '.png':
+      return 'image/png';
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg';
+    case '.gif':
+      return 'image/gif';
+    case '.webp':
+      return 'image/webp';
+    case '.svg':
+      return 'image/svg+xml';
+    case '.pdf':
+      return 'application/pdf';
+    case '.zip':
+      return 'application/zip';
+    case '.json':
+      return 'application/json';
+    case '.txt':
+      return 'text/plain';
+    case '.md':
+      return 'text/markdown';
+    case '.dart':
+      return 'text/x-dart';
+    case '.py':
+      return 'text/x-python';
+    case '.js':
+      return 'text/javascript';
+    case '.html':
+      return 'text/html';
+    case '.csv':
+      return 'text/csv';
+    default:
+      return 'application/octet-stream';
+  }
+}

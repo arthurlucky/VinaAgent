@@ -53,9 +53,6 @@ class AppSandbox {
     if (rootPath.trim().isEmpty) return null;
 
     var value = rawPath.trim().replaceAll('\\', '/');
-    if (value.isEmpty || value == '.' || value == '~') {
-      value = 'Documents';
-    }
     if (value.contains('\u0000')) return null;
 
     // SECURITY: Reject any path pointing to external storage explicitly.
@@ -69,9 +66,21 @@ class AppSandbox {
     }
 
     final rootNorm = p.canonicalize(rootPath);
+    if (value.isEmpty ||
+        value == '.' ||
+        value == '~' ||
+        value == '/' ||
+        value == 'root' ||
+        value == 'default') {
+      return rootNorm;
+    }
+
     String candidate;
-    if (value.startsWith('/')) {
+    if (value.startsWith(rootNorm)) {
       candidate = p.canonicalize(value);
+    } else if (value.startsWith('/')) {
+      final stripped = value.replaceFirst(RegExp(r'^/+'), '');
+      candidate = p.canonicalize(p.join(rootNorm, stripped));
     } else {
       value = value.replaceFirst(RegExp(r'^~/?'), '');
       candidate = p.canonicalize(p.join(rootNorm, value));

@@ -9,6 +9,7 @@ import '../../../core/db/daos.dart';
 import '../../../core/models/chat_models.dart';
 import '../../../core/storage/app_sandbox.dart';
 import '../../../core/storage/secure_keys.dart';
+import '../../agent/application/agent_workdir_controller.dart';
 import '../../agent/data/built_in_tools.dart';
 import '../../agent/data/cron_task_store.dart';
 import '../../agent/data/hermes_memory_store.dart';
@@ -110,6 +111,7 @@ class ProviderResolver {
       ...cronTools,
       ...BuiltInTools.all(
         allowedRoots: sandboxRoots,
+        activeWorkdir: _ref.read(agentWorkdirProvider),
         webSearch: _ref.read(webSearchServiceProvider),
       ),
       ...SkillTools.all(

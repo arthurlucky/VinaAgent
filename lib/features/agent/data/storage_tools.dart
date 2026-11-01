@@ -1,57 +1,93 @@
 import 'dart:io';
+
 import 'package:path/path.dart' as p;
-import 'package:pocketstrike/core/storage/app_sandbox.dart';
-import 'package:pocketstrike/features/agent/domain/agent_tool.dart';
+
+import '../../../core/storage/app_sandbox.dart';
+import '../../files/data/file_manager_service.dart';
+import '../domain/agent_tool.dart';
 
 /// Sandboxed storage tools for agent file system operations on mobile devices.
 class StorageAgentTools {
   const StorageAgentTools._();
 
-  static List<AgentTool> tools({required List<String> allowedRoots}) {
+  static List<AgentTool> tools({
+    required List<String> allowedRoots,
+    String activeWorkdir = '',
+  }) {
     return [
-      listFiles(allowedRoots),
-      readFile(allowedRoots),
-      writeFile(allowedRoots),
-      createFolder(allowedRoots),
-      deleteFile(allowedRoots),
-      moveFile(allowedRoots),
-      batchMoveFiles(allowedRoots),
-      organizeDirectory(allowedRoots),
-      searchFiles(allowedRoots),
+      listFiles(allowedRoots, activeWorkdir),
+      readFile(allowedRoots, activeWorkdir),
+      writeFile(allowedRoots, activeWorkdir),
+      createFolder(allowedRoots, activeWorkdir),
+      deleteFile(allowedRoots, activeWorkdir),
+      moveFile(allowedRoots, activeWorkdir),
+      batchMoveFiles(allowedRoots, activeWorkdir),
+      organizeDirectory(allowedRoots, activeWorkdir),
+      searchFiles(allowedRoots, activeWorkdir),
+      compressToZip(allowedRoots, activeWorkdir),
+      extractZip(allowedRoots, activeWorkdir),
+      sendFileAttachment(allowedRoots, activeWorkdir),
+      getWorkdir(activeWorkdir),
     ];
   }
 
-  /// Resolves a friendly sandbox path (e.g. "Downloads/notes.txt") into an
-  /// absolute path inside the app sandbox. Returns the raw value when the
-  /// sandbox has no roots; the caller then rejects it via [_isAllowed].
-  static String _resolvePath(String rawPath, List<String> allowedRoots) {
+  /// Resolves a path into an absolute path inside the app sandbox, taking the
+  /// active working directory into account for relative paths.
+  static String _resolvePath(
+    String rawPath,
+    List<String> allowedRoots, [
+    String activeWorkdir = '',
+  ]) {
     if (allowedRoots.isEmpty) return rawPath.trim();
-    return AppSandbox.resolveWithRoot(rawPath, allowedRoots.first) ??
-        rawPath.trim();
+    final root = allowedRoots.first;
+    final trimmed = rawPath.trim().replaceAll('\\', '/');
+
+    if (trimmed.startsWith('/') || trimmed.startsWith(root)) {
+      final stripped = trimmed.replaceFirst(RegExp(r'^/+'), '');
+      return AppSandbox.resolveWithRoot(stripped, root) ??
+          p.join(root, stripped);
+    }
+
+    final wd = activeWorkdir
+        .trim()
+        .replaceAll('\\', '/')
+        .replaceAll(RegExp(r'^/+'), '');
+    if (wd.isNotEmpty && wd != 'default' && wd != 'root') {
+      final combined = p.join(wd, trimmed);
+      return AppSandbox.resolveWithRoot(combined, root) ??
+          p.join(root, combined);
+    }
+
+    return AppSandbox.resolveWithRoot(trimmed, root) ?? p.join(root, trimmed);
   }
 
   static bool _isAllowed(String targetPath, List<String> allowedRoots) {
     return AppSandbox.isAllowed(targetPath, allowedRoots);
   }
 
-  static AgentTool listFiles(List<String> allowedRoots) => AgentTool(
+  static AgentTool listFiles(
+    List<String> allowedRoots, [
+    String activeWorkdir = '',
+  ]) =>
+      AgentTool(
         name: 'list_files',
         description:
-            'Lists files and directories at the specified path (e.g. "Downloads" or "Documents/report.txt").',
+            'Lists files and directories at the specified path (e.g. "." or "Downloads"). Defaults to current workdir.',
         inputSchema: const {
           'type': 'object',
           'properties': {
             'path': {
               'type': 'string',
-              'description': 'Directory path to list (e.g. "Downloads").',
+              'description':
+                  'Directory path to list (e.g. "." or "Downloads").',
             },
           },
           'required': ['path'],
         },
         risk: ToolRisk.safe,
         run: (args) async {
-          final rawPath = args['path'] as String? ?? 'Downloads';
-          final path = _resolvePath(rawPath, allowedRoots);
+          final rawPath = args['path'] as String? ?? '.';
+          final path = _resolvePath(rawPath, allowedRoots, activeWorkdir);
 
           if (!_isAllowed(path, allowedRoots)) {
             return 'Error: Access denied. Path "$path" is outside allowed root folders.';
@@ -72,10 +108,14 @@ class StorageAgentTools {
         },
       );
 
-  static AgentTool readFile(List<String> allowedRoots) => AgentTool(
+  static AgentTool readFile(
+    List<String> allowedRoots, [
+    String activeWorkdir = '',
+  ]) =>
+      AgentTool(
         name: 'read_file',
         description:
-            'Reads text content from a file at the specified path (e.g. "Downloads/notes.txt").',
+            'Reads text content from a file at the specified path (e.g. "notes.txt").',
         inputSchema: const {
           'type': 'object',
           'properties': {
@@ -89,7 +129,7 @@ class StorageAgentTools {
         risk: ToolRisk.safe,
         run: (args) async {
           final rawPath = args['path'] as String? ?? '';
-          final path = _resolvePath(rawPath, allowedRoots);
+          final path = _resolvePath(rawPath, allowedRoots, activeWorkdir);
 
           if (!_isAllowed(path, allowedRoots)) {
             return 'Error: Access denied. Path "$path" is outside allowed root folders.';
@@ -103,16 +143,20 @@ class StorageAgentTools {
         },
       );
 
-  static AgentTool writeFile(List<String> allowedRoots) => AgentTool(
+  static AgentTool writeFile(
+    List<String> allowedRoots, [
+    String activeWorkdir = '',
+  ]) =>
+      AgentTool(
         name: 'write_file',
         description:
-            'Writes or overwrites text content to a file at the specified path (e.g. "Downloads/joke.txt"). Creates file if missing.',
+            'Writes or overwrites text content to a file at the specified path. Creates file if missing. Relative paths resolve to current workdir.',
         inputSchema: const {
           'type': 'object',
           'properties': {
             'path': {
               'type': 'string',
-              'description': 'File path to write to (e.g. "Downloads/joke.txt").',
+              'description': 'File path to write to.',
             },
             'content': {
               'type': 'string',
@@ -124,7 +168,7 @@ class StorageAgentTools {
         risk: ToolRisk.safe,
         run: (args) async {
           final rawPath = args['path'] as String? ?? '';
-          final path = _resolvePath(rawPath, allowedRoots);
+          final path = _resolvePath(rawPath, allowedRoots, activeWorkdir);
           final content = args['content'] as String? ?? '';
 
           if (!_isAllowed(path, allowedRoots)) {
@@ -137,15 +181,20 @@ class StorageAgentTools {
         },
       );
 
-  static AgentTool createFolder(List<String> allowedRoots) => AgentTool(
+  static AgentTool createFolder(
+    List<String> allowedRoots, [
+    String activeWorkdir = '',
+  ]) =>
+      AgentTool(
         name: 'create_folder',
-        description: 'Creates a new directory folder at the specified path.',
+        description:
+            'Creates a new directory folder at the specified path. Relative paths resolve to current workdir.',
         inputSchema: const {
           'type': 'object',
           'properties': {
             'path': {
               'type': 'string',
-              'description': 'Directory path to create (e.g. "Downloads/MyFolder").',
+              'description': 'Directory path to create.',
             },
           },
           'required': ['path'],
@@ -153,7 +202,7 @@ class StorageAgentTools {
         risk: ToolRisk.safe,
         run: (args) async {
           final rawPath = args['path'] as String? ?? '';
-          final path = _resolvePath(rawPath, allowedRoots);
+          final path = _resolvePath(rawPath, allowedRoots, activeWorkdir);
 
           if (!_isAllowed(path, allowedRoots)) {
             return 'Error: Access denied. Path "$path" is outside allowed root folders.';
@@ -164,10 +213,13 @@ class StorageAgentTools {
         },
       );
 
-  static AgentTool deleteFile(List<String> allowedRoots) => AgentTool(
+  static AgentTool deleteFile(
+    List<String> allowedRoots, [
+    String activeWorkdir = '',
+  ]) =>
+      AgentTool(
         name: 'delete_file',
-        description:
-            'Deletes a file or directory at the specified path.',
+        description: 'Deletes a file or directory at the specified path.',
         inputSchema: const {
           'type': 'object',
           'properties': {
@@ -181,7 +233,7 @@ class StorageAgentTools {
         risk: ToolRisk.destructive,
         run: (args) async {
           final rawPath = args['path'] as String? ?? '';
-          final path = _resolvePath(rawPath, allowedRoots);
+          final path = _resolvePath(rawPath, allowedRoots, activeWorkdir);
 
           if (!_isAllowed(path, allowedRoots)) {
             return 'Error: Access denied. Path "$path" is outside allowed root folders.';
@@ -199,9 +251,14 @@ class StorageAgentTools {
         },
       );
 
-  static AgentTool moveFile(List<String> allowedRoots) => AgentTool(
+  static AgentTool moveFile(
+    List<String> allowedRoots, [
+    String activeWorkdir = '',
+  ]) =>
+      AgentTool(
         name: 'move_file',
-        description: 'Moves or renames a file/directory from source to destination.',
+        description:
+            'Moves or renames a file/directory from source to destination.',
         inputSchema: const {
           'type': 'object',
           'properties': {
@@ -218,9 +275,12 @@ class StorageAgentTools {
         },
         risk: ToolRisk.safe,
         run: (args) async {
-          final src = _resolvePath(args['sourcePath'] as String? ?? '', allowedRoots);
-          final dst = _resolvePath(args['destinationPath'] as String? ?? '', allowedRoots);
-          if (!_isAllowed(src, allowedRoots) || !_isAllowed(dst, allowedRoots)) {
+          final src = _resolvePath(
+              args['sourcePath'] as String? ?? '', allowedRoots, activeWorkdir);
+          final dst = _resolvePath(args['destinationPath'] as String? ?? '',
+              allowedRoots, activeWorkdir);
+          if (!_isAllowed(src, allowedRoots) ||
+              !_isAllowed(dst, allowedRoots)) {
             return 'Error: Access denied. Both source and destination must be inside allowed root folders.';
           }
           final type = await FileSystemEntity.type(src);
@@ -237,7 +297,6 @@ class StorageAgentTools {
               try {
                 await file.rename(dst);
               } catch (_) {
-                // Fallback for cross-device partitions or permission boundaries
                 await file.copy(dst);
                 await file.delete();
               }
@@ -249,7 +308,11 @@ class StorageAgentTools {
         },
       );
 
-  static AgentTool batchMoveFiles(List<String> allowedRoots) => AgentTool(
+  static AgentTool batchMoveFiles(
+    List<String> allowedRoots, [
+    String activeWorkdir = '',
+  ]) =>
+      AgentTool(
         name: 'batch_move_files',
         description:
             'Moves multiple files or organizes a list of files into target directories in a single operation. '
@@ -259,7 +322,8 @@ class StorageAgentTools {
           'properties': {
             'moves': {
               'type': 'array',
-              'description': 'List of move operations with sourcePath and destinationPath.',
+              'description':
+                  'List of move operations with sourcePath and destinationPath.',
               'items': {
                 'type': 'object',
                 'properties': {
@@ -283,9 +347,12 @@ class StorageAgentTools {
 
           for (final item in movesRaw) {
             if (item is! Map) continue;
-            final src = _resolvePath(item['sourcePath'] as String? ?? '', allowedRoots);
-            final dst = _resolvePath(item['destinationPath'] as String? ?? '', allowedRoots);
-            if (!_isAllowed(src, allowedRoots) || !_isAllowed(dst, allowedRoots)) {
+            final src = _resolvePath(item['sourcePath'] as String? ?? '',
+                allowedRoots, activeWorkdir);
+            final dst = _resolvePath(item['destinationPath'] as String? ?? '',
+                allowedRoots, activeWorkdir);
+            if (!_isAllowed(src, allowedRoots) ||
+                !_isAllowed(dst, allowedRoots)) {
               errors.add('Access denied for $src -> $dst');
               continue;
             }
@@ -314,7 +381,8 @@ class StorageAgentTools {
             }
           }
 
-          final buffer = StringBuffer('Successfully moved $movedCount file(s).');
+          final buffer =
+              StringBuffer('Successfully moved $movedCount file(s).');
           if (errors.isNotEmpty) {
             buffer.write('\nWarnings/Errors:\n• ${errors.join("\n• ")}');
           }
@@ -322,7 +390,11 @@ class StorageAgentTools {
         },
       );
 
-  static AgentTool organizeDirectory(List<String> allowedRoots) => AgentTool(
+  static AgentTool organizeDirectory(
+    List<String> allowedRoots, [
+    String activeWorkdir = '',
+  ]) =>
+      AgentTool(
         name: 'organize_directory',
         description:
             'Automatically organizes and sorts all files in a directory into categorized subfolders '
@@ -332,15 +404,15 @@ class StorageAgentTools {
           'properties': {
             'directory': {
               'type': 'string',
-              'description': 'Directory path to organize (e.g. "Downloads").',
+              'description': 'Directory path to organize.',
             },
           },
           'required': ['directory'],
         },
         risk: ToolRisk.safe,
         run: (args) async {
-          final rawPath = args['directory'] as String? ?? 'Downloads';
-          final dirPath = _resolvePath(rawPath, allowedRoots);
+          final rawPath = args['directory'] as String? ?? '.';
+          final dirPath = _resolvePath(rawPath, allowedRoots, activeWorkdir);
 
           if (!_isAllowed(dirPath, allowedRoots)) {
             return 'Error: Access denied. Path "$dirPath" is outside allowed root folders.';
@@ -349,7 +421,6 @@ class StorageAgentTools {
           if (!await dir.exists()) return 'Directory "$dirPath" does not exist.';
 
           const extensionsToFolder = <String, String>{
-            // Documents
             '.pdf': 'Documents',
             '.doc': 'Documents',
             '.docx': 'Documents',
@@ -358,28 +429,24 @@ class StorageAgentTools {
             '.csv': 'Documents',
             '.pptx': 'Documents',
             '.epub': 'Documents',
-            // Images
             '.jpg': 'Images',
             '.jpeg': 'Images',
             '.png': 'Images',
             '.gif': 'Images',
             '.webp': 'Images',
             '.svg': 'Images',
-            // Media
             '.mp3': 'Audio',
             '.m4a': 'Audio',
             '.wav': 'Audio',
             '.mp4': 'Videos',
             '.mkv': 'Videos',
             '.mov': 'Videos',
-            // Archives & Installers
             '.zip': 'Archives',
             '.rar': 'Archives',
             '.7z': 'Archives',
             '.tar': 'Archives',
             '.gz': 'Archives',
             '.apk': 'APKs',
-            // Code & Data
             '.dart': 'Code',
             '.py': 'Code',
             '.js': 'Code',
@@ -416,15 +483,20 @@ class StorageAgentTools {
         },
       );
 
-  static AgentTool searchFiles(List<String> allowedRoots) => AgentTool(
+  static AgentTool searchFiles(
+    List<String> allowedRoots, [
+    String activeWorkdir = '',
+  ]) =>
+      AgentTool(
         name: 'search_files',
-        description: 'Searches for files matching a pattern inside a directory.',
+        description:
+            'Searches for files matching a pattern inside a directory.',
         inputSchema: const {
           'type': 'object',
           'properties': {
             'directory': {
               'type': 'string',
-              'description': 'Root directory to search (e.g. "Downloads").',
+              'description': 'Root directory to search.',
             },
             'query': {
               'type': 'string',
@@ -435,8 +507,8 @@ class StorageAgentTools {
         },
         risk: ToolRisk.safe,
         run: (args) async {
-          final rawPath = args['directory'] as String? ?? 'Downloads';
-          final dirPath = _resolvePath(rawPath, allowedRoots);
+          final rawPath = args['directory'] as String? ?? '.';
+          final dirPath = _resolvePath(rawPath, allowedRoots, activeWorkdir);
           final query = (args['query'] as String? ?? '').toLowerCase();
 
           if (!_isAllowed(dirPath, allowedRoots)) {
@@ -451,8 +523,153 @@ class StorageAgentTools {
               matches.add(entity.path);
             }
           }
-          if (matches.isEmpty) return 'No files matched "$query" in "$dirPath".';
+          if (matches.isEmpty) {
+            return 'No files matched "$query" in "$dirPath".';
+          }
           return 'Found ${matches.length} matching files:\n${matches.join("\n")}';
+        },
+      );
+
+  static AgentTool compressToZip(
+    List<String> allowedRoots, [
+    String activeWorkdir = '',
+  ]) =>
+      AgentTool(
+        name: 'compress_to_zip',
+        description:
+            'Compresses a file or directory into a .zip archive inside the sandbox.',
+        inputSchema: const {
+          'type': 'object',
+          'properties': {
+            'sourcePath': {
+              'type': 'string',
+              'description':
+                  'Path of file or directory to compress (relative to workdir or root).',
+            },
+            'zipFileName': {
+              'type': 'string',
+              'description':
+                  'Optional name for the output zip file (e.g. "archive.zip").',
+            },
+          },
+          'required': ['sourcePath'],
+        },
+        risk: ToolRisk.safe,
+        run: (args) async {
+          final rawPath = args['sourcePath'] as String? ?? '';
+          final sourcePath =
+              _resolvePath(rawPath, allowedRoots, activeWorkdir);
+          if (!_isAllowed(sourcePath, allowedRoots)) {
+            return 'Error: Access denied. Path "$sourcePath" is outside allowed root folders.';
+          }
+          final zipName = args['zipFileName'] as String?;
+          const manager = FileManagerService();
+          final outZip =
+              await manager.compressToZip(sourcePath, zipFileName: zipName);
+          return 'Successfully compressed to "$outZip".';
+        },
+      );
+
+  static AgentTool extractZip(
+    List<String> allowedRoots, [
+    String activeWorkdir = '',
+  ]) =>
+      AgentTool(
+        name: 'extract_zip',
+        description:
+            'Extracts a .zip archive into a target folder in the sandbox.',
+        inputSchema: const {
+          'type': 'object',
+          'properties': {
+            'zipPath': {
+              'type': 'string',
+              'description':
+                  'Path of the .zip file to extract (relative to workdir or root).',
+            },
+            'targetFolder': {
+              'type': 'string',
+              'description': 'Optional target folder to extract into.',
+            },
+          },
+          'required': ['zipPath'],
+        },
+        risk: ToolRisk.safe,
+        run: (args) async {
+          final rawPath = args['zipPath'] as String? ?? '';
+          final zipPath = _resolvePath(rawPath, allowedRoots, activeWorkdir);
+          if (!_isAllowed(zipPath, allowedRoots)) {
+            return 'Error: Access denied. Path "$zipPath" is outside allowed root folders.';
+          }
+          final rawTarget = args['targetFolder'] as String?;
+          final targetFolder = (rawTarget != null && rawTarget.isNotEmpty)
+              ? _resolvePath(rawTarget, allowedRoots, activeWorkdir)
+              : null;
+          const manager = FileManagerService();
+          final outDir =
+              await manager.extractZip(zipPath, targetFolderPath: targetFolder);
+          return 'Successfully extracted zip to "$outDir".';
+        },
+      );
+
+  static AgentTool sendFileAttachment(
+    List<String> allowedRoots, [
+    String activeWorkdir = '',
+  ]) =>
+      AgentTool(
+        name: 'send_file_attachment',
+        description:
+            'Sends and attaches a file from the app sandbox to the chat message so the user can easily view, preview, or download it.',
+        inputSchema: const {
+          'type': 'object',
+          'properties': {
+            'path': {
+              'type': 'string',
+              'description':
+                  'Sandbox path of the file to attach (relative to workdir or root).',
+            },
+            'name': {
+              'type': 'string',
+              'description': 'Optional display name for the attachment.',
+            },
+          },
+          'required': ['path'],
+        },
+        risk: ToolRisk.safe,
+        run: (args) async {
+          final rawPath = args['path'] as String? ?? '';
+          final path = _resolvePath(rawPath, allowedRoots, activeWorkdir);
+          if (!_isAllowed(path, allowedRoots)) {
+            return 'Error: Access denied. Path "$path" is outside allowed root folders.';
+          }
+          final file = File(path);
+          if (!await file.exists()) {
+            return 'Error: File "$path" does not exist.';
+          }
+          final stat = await file.stat();
+          final displayName = (args['name'] as String?)?.trim().isNotEmpty == true
+              ? (args['name'] as String).trim()
+              : p.basename(file.path);
+          return 'ATTACHMENT_SENT: {"name": "$displayName", "path": "${file.path}", "size": ${stat.size}}';
+        },
+      );
+
+  static AgentTool getWorkdir([String activeWorkdir = '']) => AgentTool(
+        name: 'get_workdir',
+        description:
+            'Returns the current working directory of the agent inside the app sandbox.',
+        inputSchema: const {
+          'type': 'object',
+          'properties': {},
+        },
+        risk: ToolRisk.safe,
+        run: (_) async {
+          final cur = activeWorkdir.trim();
+          return (cur.isEmpty ||
+                  cur == 'default' ||
+                  cur == 'root' ||
+                  cur == '/')
+              ? 'Current working directory: root/'
+              : 'Current working directory: root/$cur';
         },
       );
 }
