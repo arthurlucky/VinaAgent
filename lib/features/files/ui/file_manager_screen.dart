@@ -164,7 +164,7 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
                             _breadcrumb[i],
                             style: TextStyle(
                               color: i == _breadcrumb.length - 1
-                                  ? tokens.textPrimary
+                                  ? Theme.of(context).textTheme.bodyMedium?.color ?? Colors.black
                                   : tokens.textSecondary,
                               fontSize: 12,
                             ),

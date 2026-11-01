@@ -24,6 +24,7 @@ import 'package:pocketstrike/features/settings/ui/storage_settings_screen.dart';
 import 'package:pocketstrike/features/settings/ui/telegram_settings_screen.dart';
 import 'package:pocketstrike/features/skills/ui/skills_screen.dart';
 import 'package:pocketstrike/features/web/ui/web_search_settings_screen.dart';
+import 'package:pocketstrike/features/agents/ui/agents_settings_screen.dart';
 
 /// App routes.
 abstract class AppRoutes {
