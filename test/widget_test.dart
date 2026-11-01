@@ -39,7 +39,7 @@ class MockCronTaskNotifier extends CronTaskNotifier {
 }
 
 void main() {
-  testWidgets('PocketStrike app renders successfully', (WidgetTester tester) async {
+  testWidgets('Vina Agent app renders successfully', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'onboarding_done': true,
       'telegram_bridge_enabled': false,
@@ -64,11 +64,11 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: const PocketStrikeApp(),
+        child: const VinaAgentApp(),
       ),
     );
 
     await tester.pump();
-    expect(find.byType(PocketStrikeApp), findsOneWidget);
+    expect(find.byType(VinaAgentApp), findsOneWidget);
   });
 }

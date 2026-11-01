@@ -167,13 +167,14 @@ class WebSearchService {
     final limit = (maxResults ?? cfg.maxResults).clamp(1, 10);
 
     try {
-      return switch (selected) {
+      final future = switch (selected) {
         WebSearchProvider.tavily => _tavily(clean, limit),
         WebSearchProvider.brave => _brave(clean, limit),
         WebSearchProvider.serper => _serper(clean, limit),
         WebSearchProvider.exa => _exa(clean, limit),
         WebSearchProvider.duckduckgo => _duckDuckGo(clean, limit),
       };
+      return await future;
     } on DioException catch (e) {
       final status = e.response?.statusCode;
       final detail = _errorDetail(e.response?.data);
