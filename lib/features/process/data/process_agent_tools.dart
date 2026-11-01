@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
@@ -113,7 +112,7 @@ class ProcessAgentTools {
             },
           },
         },
-        risk: ToolRisk.dangerous,
+        risk: ToolRisk.destructive,
         run: (args) async {
           var cmd = args['command'] as String? ?? '';
           final scriptFile = args['script_file'] as String?;
@@ -218,7 +217,7 @@ class ProcessAgentTools {
           },
           'required': ['command'],
         },
-        risk: ToolRisk.dangerous,
+        risk: ToolRisk.destructive,
         run: (args) async {
           final command = args['command'] as String? ?? '';
           final name = args['name'] as String?;
@@ -348,7 +347,7 @@ class ProcessAgentTools {
           },
           'required': ['task_id'],
         },
-        risk: ToolRisk.dangerous,
+        risk: ToolRisk.destructive,
         run: (args) async {
           final taskId = (args['task_id'] as String? ?? '').trim();
           final task = processManager.getTask(taskId);

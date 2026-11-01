@@ -108,13 +108,12 @@ class WebSearchException implements Exception {
 
 /// Configurable web search used by the `web_search` agent tool.
 class WebSearchService {
+  // ignore: prefer_initializing_formals
   WebSearchService({
     required SharedPreferences prefs,
     required SecureKeyStore keys,
     Dio? dio,
-  })  // ignore: prefer_initializing_formals
-      : _prefs = prefs,
-        // ignore: prefer_initializing_formals
+  })  : _prefs = prefs,
         _keys = keys,
         _dio = dio ??
             Dio(BaseOptions(

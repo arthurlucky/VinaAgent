@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/db/app_database.dart';
@@ -9,25 +10,33 @@ import '../../../core/storage/prefs_provider.dart';
 
 const String _kLastActiveConvKey = 'last_active_conversation_id';
 
+class CurrentConversationNotifier extends StateNotifier<String?> {
+  CurrentConversationNotifier(this._prefs)
+      : super(_prefs.getString(_kLastActiveConvKey));
+
+  final SharedPreferences _prefs;
+
+  @override
+  set state(String? value) {
+    super.state = value;
+    if (value == null) {
+      _prefs.remove(_kLastActiveConvKey);
+    } else {
+      _prefs.setString(_kLastActiveConvKey, value);
+    }
+  }
+}
+
 /// Sidebar list: pinned first, then recent.
 final conversationsProvider = StreamProvider<List<Conversation>>((ref) {
   return ref.watch(appDatabaseProvider).conversationsDao.watchAll();
 });
 
 /// The conversation currently open in the chat screen (null = fresh draft).
-final currentConversationIdProvider = StateProvider<String?>((ref) {
+final currentConversationIdProvider =
+    StateNotifierProvider<CurrentConversationNotifier, String?>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
-  final initial = prefs.getString(_kLastActiveConvKey);
-
-  ref.listenSelf((previous, next) {
-    if (next == null) {
-      prefs.remove(_kLastActiveConvKey);
-    } else {
-      prefs.setString(_kLastActiveConvKey, next);
-    }
-  });
-
-  return initial;
+  return CurrentConversationNotifier(prefs);
 });
 
 final currentConversationProvider = StreamProvider<Conversation?>((ref) {

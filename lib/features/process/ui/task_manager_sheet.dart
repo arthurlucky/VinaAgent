@@ -127,7 +127,7 @@ class _TaskManagerSheetState extends ConsumerState<TaskManagerSheet> {
                 : ListView.separated(
                     padding: const EdgeInsets.all(16),
                     itemCount: tasks.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    separatorBuilder: (context, index) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final task = tasks[index];
                       return _ProcessTaskCard(
@@ -433,7 +433,6 @@ class _ProcessLogsSheetState extends ConsumerState<_ProcessLogsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = context.glass;
     final processManager = ref.watch(processManagerProvider);
     final task = processManager.getTask(widget.taskId);
 
