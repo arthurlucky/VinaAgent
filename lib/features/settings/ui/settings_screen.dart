@@ -126,6 +126,12 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: 'Versioned documents, code, HTML and data produced by the agent',
             onTap: () => context.push(AppRoutes.settingsArtifacts),
           ),
+          _SettingsTile(
+            icon: Icons.folder_open_outlined,
+            title: 'File Manager',
+            subtitle: 'Browse sandbox files and import from device storage',
+            onTap: () => context.push(AppRoutes.settingsFiles),
+          ),
 
           const SizedBox(height: 12),
           const _SectionHeader(title: 'INTEGRATIONS & STORAGE'),
@@ -167,22 +173,6 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => context.push('/settings/about'),
           ),
 
-          const SizedBox(height: 12),
-          const _SectionHeader(title: 'COMMUNITY & DEVELOPER'),
-          _SettingsTile(
-            customLeading: const _YouTubeLogo(),
-            title: 'Thevoidkernel youtube',
-            subtitle: 'https://www.youtube.com/@thevoidkernel',
-            onTap: () =>
-                _openUrl(context, 'https://www.youtube.com/@thevoidkernel'),
-          ),
-          _SettingsTile(
-            customLeading: const _GitHubLogo(),
-            title: 'Built by Mohd Abuzar',
-            subtitle: 'https://github.com/AbuZar-Ansarii',
-            onTap: () =>
-                _openUrl(context, 'https://github.com/AbuZar-Ansarii'),
-          ),
           const SizedBox(height: 16),
         ],
       ),

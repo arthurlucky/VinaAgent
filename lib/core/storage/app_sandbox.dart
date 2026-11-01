@@ -46,6 +46,9 @@ class AppSandbox {
 
   /// Resolves [rawPath] against [rootPath]. Returns `null` when the path
   /// escapes the sandbox or contains a null byte.
+  /// 
+  /// SECURITY: Absolute block on external storage paths (/sdcard, /storage/emulated/0).
+  /// Agent cannot read or write outside the app sandbox under any circumstances.
   static String? resolveWithRoot(String rawPath, String rootPath) {
     if (rootPath.trim().isEmpty) return null;
 
@@ -55,12 +58,14 @@ class AppSandbox {
     }
     if (value.contains('\u0000')) return null;
 
-    // Common external paths are mapped to the sandbox equivalent instead of
-    // being granted real device access.
-    final external =
-        RegExp(r'^/?(?:storage/emulated/\d+|sdcard)/(.*)$').firstMatch(value);
-    if (external != null) {
-      value = external.group(1) ?? '';
+    // SECURITY: Reject any path pointing to external storage explicitly.
+    // Do NOT map it; error is clearer to the user.
+    final externalPattern = RegExp(r'^/?(?:storage|sdcard|mnt)(/|$)');
+    if (externalPattern.hasMatch(value)) {
+      throw StateError(
+        'Access denied: agent cannot access $value. '
+        'All reads/writes restricted to app sandbox: $rootPath'
+      );
     }
 
     final rootNorm = p.canonicalize(rootPath);
@@ -75,7 +80,11 @@ class AppSandbox {
     if (candidate == rootNorm || p.isWithin(rootNorm, candidate)) {
       return candidate;
     }
-    return null;
+    // Path escapes sandbox
+    throw StateError(
+      'Access denied: $rawPath escapes sandbox. '
+      'Restricted to: $rootPath'
+    );
   }
 
   /// True when [targetPath] is inside one of [allowedRoots].

@@ -858,7 +858,7 @@ class ChatController extends StateNotifier<ChatState> {
           ? hermesContext
           : '$systemPrompt\n\n$hermesContext';
     } else if (systemPrompt.isEmpty) {
-      systemPrompt = 'You are PocketStrike AI, a helpful, intelligent, and concise assistant.';
+      systemPrompt = 'You are Vina Agent, a helpful, intelligent, and concise AI assistant.';
     }
 
     // Skills: agent mode gets the full progressive-disclosure catalog

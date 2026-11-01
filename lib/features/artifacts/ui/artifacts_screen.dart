@@ -281,31 +281,7 @@ class _PreviewTab extends StatelessWidget {
       );
     }
     if (artifact.type == 'html') {
-      return ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Theme.of(context)
-                  .colorScheme
-                  .surfaceContainerHighest
-                  .withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Text(
-              'HTML artifacts are stored as source. Use the Code tab to copy '
-              'or edit the markup; previewing HTML in-app is disabled to avoid '
-              'running untrusted scripts.',
-            ),
-          ),
-          const SizedBox(height: 12),
-          SelectableText(
-            content,
-            style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-          ),
-        ],
-      );
+      return _HtmlPreviewTab(content: content, artifact: artifact);
     }
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -420,5 +396,59 @@ class _VersionsTab extends StatelessWidget {
     String two(int v) => v.toString().padLeft(2, '0');
     return '${local.year}-${two(local.month)}-${two(local.day)} '
         '${two(local.hour)}:${two(local.minute)}';
+  }
+}
+
+class _HtmlPreviewTab extends StatelessWidget {
+  const _HtmlPreviewTab({
+    required this.content,
+    required this.artifact,
+  });
+
+  final String content;
+  final Artifact artifact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'HTML Preview',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => _openInBrowser(content),
+                icon: const Icon(Icons.open_in_browser, size: 16),
+                label: const Text('Open in Browser'),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Container(
+            color: Colors.white,
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: SelectableText(
+                  content,
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  static void _openInBrowser(String html) {
+    // TODO: Implement HTML browser opening via file:// or WebView
   }
 }
