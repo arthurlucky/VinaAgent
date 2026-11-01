@@ -52,7 +52,7 @@ class LocalNotificationService {
 
       const androidDetails = AndroidNotificationDetails(
         'pocketstrike_reminders_channel',
-        'PocketStrike Reminders & Tasks',
+        'Vina Agent Reminders & Tasks',
         channelDescription:
             'Local OS notifications for scheduled agent reminders and cron tasks.',
         importance: Importance.max,

@@ -166,7 +166,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
         ),
         title: Text(
-          conversation?.title ?? 'PocketStrike',
+          conversation?.title ?? 'Vina Agent',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
@@ -267,7 +267,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 ? EmptyState(
                     icon: AppIcons.key,
                     title: 'No AI provider yet',
-                    message: 'PocketStrike needs at least one provider '
+                    message: 'Vina Agent needs at least one provider '
                         'to chat. Add OpenAI, Claude, Gemini, Groq, '
                         'OpenRouter or Ollama — or switch to Local mode.',
                     actionLabel: 'Add a provider',

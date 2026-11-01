@@ -840,7 +840,7 @@ class _ConnectMcpSheetState extends ConsumerState<ConnectMcpSheet> {
                               id: 'github',
                               label: 'GitHub',
                               icon: AppIcons.code,
-                              defaultAuthUrl: 'https://github.com/settings/tokens/new?description=PocketStrike%20MCP&scopes=repo,read:org',
+                              defaultAuthUrl: 'https://github.com/settings/tokens/new?description=VinaAgent%20MCP&scopes=repo,read:org',
                             ),
                           ],
                         ),

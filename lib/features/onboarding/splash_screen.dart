@@ -52,12 +52,12 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 20),
             Text(
-              'PocketStrike',
+              'Vina Agent',
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 6),
             Text(
-              'Your pocket AI agent',
+              'Your pocket AI agent workstation',
               style: Theme.of(context)
                   .textTheme
                   .bodyMedium

@@ -929,7 +929,7 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
                             : (chatState.localMode
                                 ? 'Ask your local GGUF model offline...'
                                 : (widget.enabled
-                                    ? 'Message PocketStrike…'
+                                    ? 'Message Vina Agent…'
                                     : 'Add a provider to start chatting'))),
                     hintStyle: TextStyle(
                       color: _isListening
