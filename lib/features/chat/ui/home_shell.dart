@@ -42,6 +42,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(conversationPersistenceProvider);
     return const Scaffold(
       drawer: AppDrawer(),
       body: ChatScreen(),

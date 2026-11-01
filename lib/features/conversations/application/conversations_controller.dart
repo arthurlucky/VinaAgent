@@ -10,33 +10,33 @@ import '../../../core/storage/prefs_provider.dart';
 
 const String _kLastActiveConvKey = 'last_active_conversation_id';
 
-class CurrentConversationNotifier extends StateNotifier<String?> {
-  CurrentConversationNotifier(this._prefs)
-      : super(_prefs.getString(_kLastActiveConvKey));
-
-  final SharedPreferences _prefs;
-
-  @override
-  set state(String? value) {
-    super.state = value;
-    if (value == null) {
-      _prefs.remove(_kLastActiveConvKey);
-    } else {
-      _prefs.setString(_kLastActiveConvKey, value);
-    }
-  }
-}
-
 /// Sidebar list: pinned first, then recent.
 final conversationsProvider = StreamProvider<List<Conversation>>((ref) {
   return ref.watch(appDatabaseProvider).conversationsDao.watchAll();
 });
 
 /// The conversation currently open in the chat screen (null = fresh draft).
-final currentConversationIdProvider =
-    StateNotifierProvider<CurrentConversationNotifier, String?>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return CurrentConversationNotifier(prefs);
+final currentConversationIdProvider = StateProvider<String?>((ref) {
+  try {
+    final prefs = ref.watch(sharedPreferencesProvider);
+    return prefs.getString(_kLastActiveConvKey);
+  } catch (_) {
+    return null;
+  }
+});
+
+/// Synchronizes current conversation ID to persistent SharedPreferences.
+final conversationPersistenceProvider = Provider<void>((ref) {
+  try {
+    final prefs = ref.watch(sharedPreferencesProvider);
+    ref.listen<String?>(currentConversationIdProvider, (previous, next) {
+      if (next == null) {
+        prefs.remove(_kLastActiveConvKey);
+      } else {
+        prefs.setString(_kLastActiveConvKey, next);
+      }
+    });
+  } catch (_) {}
 });
 
 final currentConversationProvider = StreamProvider<Conversation?>((ref) {
