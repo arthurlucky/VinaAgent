@@ -10,7 +10,7 @@ class ConversationTabs extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final conversations = ref.watch(allConversationsProvider);
+    final conversations = ref.watch(conversationsProvider);
     final currentId = ref.watch(currentConversationIdProvider);
     final tokens = context.glass;
 
@@ -18,8 +18,7 @@ class ConversationTabs extends ConsumerWidget {
       loading: () => const SizedBox(height: 48, child: SizedBox.shrink()),
       error: (error, _) => const SizedBox.shrink(),
       data: (convs) {
-        final active = convs.where((c) => !c.deletedAt.isBefore(DateTime.now())).toList();
-        if (active.length <= 1) return const SizedBox.shrink();
+        if (convs.length <= 1) return const SizedBox.shrink();
 
         return Container(
           height: 48,
@@ -30,9 +29,9 @@ class ConversationTabs extends ConsumerWidget {
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 8),
-            itemCount: active.length + 1,
+            itemCount: convs.length + 1,
             itemBuilder: (context, index) {
-              if (index == active.length) {
+              if (index == convs.length) {
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                   child: OutlinedButton.icon(
@@ -40,7 +39,7 @@ class ConversationTabs extends ConsumerWidget {
                       await ref
                           .read(conversationActionsProvider)
                           .ensureActiveConversation();
-                      ref.invalidate(allConversationsProvider);
+                      ref.invalidate(conversationsProvider);
                     },
                     icon: const Icon(Icons.add, size: 16),
                     label: const Text('New'),
@@ -51,7 +50,7 @@ class ConversationTabs extends ConsumerWidget {
                 );
               }
 
-              final conv = active[index];
+              final conv = convs[index];
               final isActive = currentId == conv.id;
 
               return Padding(
@@ -107,7 +106,7 @@ class ConversationTabs extends ConsumerWidget {
   void _showOptions(
     BuildContext context,
     WidgetRef ref,
-    ConversationRow conv,
+    Conversation conv,
   ) {
     showModalBottomSheet<void>(
       context: context,
@@ -136,7 +135,7 @@ class ConversationTabs extends ConsumerWidget {
                 await ref
                     .read(conversationActionsProvider)
                     .deleteConversation(conv.id);
-                ref.invalidate(allConversationsProvider);
+                ref.invalidate(conversationsProvider);
               },
             ),
           ],
