@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../conversations/application/conversations_controller.dart';
 import 'chat_screen.dart';
 import 'widgets/app_drawer.dart';
-import 'widgets/multi_conversation_tabs.dart';
 
 /// Root screen: sidebar drawer + chat surface.
 class HomeShell extends ConsumerStatefulWidget {
@@ -41,14 +40,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      drawer: const AppDrawer(),
-      body: Column(
-        children: const [
-          MultiConversationTabs(),
-          Expanded(child: ChatScreen()),
-        ],
-      ),
+    return const Scaffold(
+      drawer: AppDrawer(),
+      body: ChatScreen(),
     );
   }
 }
