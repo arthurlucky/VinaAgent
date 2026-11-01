@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/glass_tokens.dart';
-import '../../conversations/application/conversations_controller.dart';
 import '../../../core/db/app_database.dart';
+import '../../conversations/application/conversations_controller.dart';
 
 /// Horizontal tab bar untuk multi-conversation switching.
 /// Menampilkan conversation list sebagai tabs dengan New button.
