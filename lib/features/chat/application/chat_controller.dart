@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -19,6 +20,7 @@ import 'package:pocketstrike/features/providers/data/mock_provider.dart';
 import 'package:pocketstrike/features/providers/domain/ai_provider.dart';
 import 'package:pocketstrike/features/providers/domain/provider_types.dart';
 import 'package:pocketstrike/features/skills/application/skills_controller.dart';
+import 'package:pocketstrike/features/skills/data/skill_author.dart';
 import 'package:pocketstrike/features/skills/domain/agent_skill.dart';
 import 'package:pocketstrike/shared/widgets/confirm_action_sheet.dart';
 import 'package:uuid/uuid.dart';
@@ -703,6 +705,79 @@ class ChatController extends StateNotifier<ChatState> {
           runStatus,
           jsonEncode(steps.map((s) => s.toJson()).toList()),
         );
+
+    if (runStatus == 'done') {
+      final lastUser = history.reversed
+          .where((message) =>
+              message.role == MessageRole.user &&
+              message.content.trim().isNotEmpty)
+          .firstOrNull
+          ?.content ??
+          '';
+      _scheduleSkillLearning(
+        provider: provider,
+        model: model,
+        userRequest: lastUser,
+        steps: steps,
+      );
+    }
+  }
+
+  /// Hermes-style reflection: after a non-trivial run, ask the model whether
+  /// the procedure is worth turning into a reusable skill. Drafts always land
+  /// in the pending queue and never activate without approval.
+  void _scheduleSkillLearning({
+    required AIProvider provider,
+    required String model,
+    required String userRequest,
+    required List<AgentStep> steps,
+  }) {
+    final observations =
+        steps.where((step) => step.type == 'observation').length;
+    final hadError =
+        steps.any((step) => step.type == 'observation' && step.isError);
+    final corrected = RegExp(
+      r'\b(salah|keliru|bukan itu|perbaiki|betulkan|wrong|incorrect|fix that|not what)\b',
+      caseSensitive: false,
+    ).hasMatch(userRequest);
+    if (observations < 5 && !hadError && !corrected) return;
+
+    unawaited(() async {
+      try {
+        final store = ref.read(skillStoreProvider);
+        if (!store.autoLearnEnabled) return;
+        final existing = await store.listSkills();
+        final pending = await store.listPending();
+        final transcript = StringBuffer();
+        for (final step in steps) {
+          if (step.type == 'toolCall') {
+            transcript.writeln(
+              'CALL ${step.toolName}(${step.argumentsJson ?? '{}'})',
+            );
+          } else if (step.type == 'observation') {
+            final result = (step.result ?? '')
+                .replaceAll(RegExp(r'\s+'), ' ')
+                .trim();
+            transcript.writeln(
+              'RESULT ${step.toolName}: '
+              '${result.length > 500 ? result.substring(0, 500) : result}'
+              '${step.isError ? ' [ERROR]' : ''}',
+            );
+          }
+        }
+        final draft = await const SkillAuthor().learnFromRun(
+          provider: provider,
+          model: model,
+          userRequest: userRequest,
+          transcript: transcript.toString(),
+          existing: existing,
+          pending: pending,
+        );
+        if (draft != null) await store.addPending(draft);
+      } catch (_) {
+        // Reflection is best-effort and must never break the chat.
+      }
+    }());
   }
 
   // ------------------------------------------------------------------

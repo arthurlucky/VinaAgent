@@ -1,11 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocketstrike/core/storage/prefs_provider.dart';
 import 'package:pocketstrike/features/skills/data/github_marketplace_client.dart';
+import 'package:pocketstrike/features/skills/data/skillsmp_client.dart';
 import 'package:pocketstrike/features/skills/domain/marketplace_models.dart';
 
-/// GitHub-backed marketplace client.
+/// GitHub installer (downloads SKILL.md + references).
 final marketplaceClientProvider = Provider<GithubMarketplaceClient>((ref) {
   return GithubMarketplaceClient();
+});
+
+/// SkillsMP search catalog (skillsmp.com REST API).
+final skillsMpClientProvider = Provider<SkillsMpClient>((ref) {
+  return SkillsMpClient();
 });
 
 /// Sources shown in the marketplace: curated defaults + user added repos.

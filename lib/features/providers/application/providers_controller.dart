@@ -104,6 +104,7 @@ class ProviderResolver {
       ...SkillTools.all(
         store: skillStore,
         marketplace: _ref.read(marketplaceClientProvider),
+        skillsMp: _ref.read(skillsMpClientProvider),
       ),
       ...manager.toolsForServers(activeIds),
     ];

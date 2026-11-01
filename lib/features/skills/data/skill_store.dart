@@ -28,6 +28,8 @@ class SkillStore {
   static const String _globalEnabledKey = 'skills_enabled';
   static const String _bundledMarker = '.bundled';
   static const String _marketplaceMarker = '.marketplace';
+  static const String _pendingKey = 'skill_pending_drafts';
+  static const String _autoLearnKey = 'skill_auto_learn';
   static const int _maxResourceChars = 16000;
   static final RegExp _validName = RegExp(r'^[a-z0-9][a-z0-9-]{0,63}$');
 
@@ -220,6 +222,7 @@ class SkillStore {
     required String name,
     required String description,
     required String instructions,
+    List<String> triggers = const [],
   }) async {
     final normalized = _normalizeName(name);
     if (!_validName.hasMatch(normalized)) {
@@ -254,9 +257,14 @@ class SkillStore {
         .map((part) => part[0].toUpperCase() + part.substring(1))
         .join(' ');
 
+    final triggerYaml = triggers.isEmpty
+        ? ''
+        : 'triggers:\n'
+            '${triggers.map((t) => '  - ${jsonEncode(t)}').join('\n')}\n';
     final contents = '---\n'
         'name: $normalized\n'
         'description: ${jsonEncode(trimmedDescription)}\n'
+        '$triggerYaml'
         '---\n\n'
         '# $title\n\n'
         '$trimmedInstructions\n';
@@ -403,6 +411,83 @@ class SkillStore {
 
     scored.sort((a, b) => b.$2.compareTo(a.$2));
     return scored.take(limit).map((entry) => entry.$1).toList();
+  }
+
+  // ------------------------------------------------------------------
+  // Pending drafts (auto-learned / AI-authored, require approval)
+  // ------------------------------------------------------------------
+
+  bool get autoLearnEnabled => _prefs.getBool(_autoLearnKey) ?? true;
+
+  Future<void> setAutoLearnEnabled(bool enabled) async {
+    await _prefs.setBool(_autoLearnKey, enabled);
+  }
+
+  Future<List<PendingSkill>> listPending() async {
+    final raw = _prefs.getStringList(_pendingKey) ?? const [];
+    final drafts = <PendingSkill>[];
+    for (final entry in raw) {
+      try {
+        drafts.add(
+          PendingSkill.fromJson(jsonDecode(entry) as Map<String, dynamic>),
+        );
+      } catch (_) {
+        // Ignore malformed drafts from older versions.
+      }
+    }
+    drafts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return drafts;
+  }
+
+  Future<void> addPending(PendingSkill draft) async {
+    final drafts = await listPending();
+    final filtered = drafts.where((d) => d.name != draft.name).toList()
+      ..add(draft);
+    final capped = filtered.length > 20
+        ? filtered.sublist(filtered.length - 20)
+        : filtered;
+    await _prefs.setStringList(
+      _pendingKey,
+      capped.map((d) => jsonEncode(d.toJson())).toList(),
+    );
+  }
+
+  Future<AgentSkill> approvePending(String id) async {
+    final drafts = await listPending();
+    final draft = drafts.where((d) => d.id == id).firstOrNull;
+    if (draft == null) {
+      throw SkillFormatException('Pending skill not found.');
+    }
+    if (await findSkill(draft.name) != null) {
+      throw SkillFormatException(
+        'A skill named "${draft.name}" already exists.',
+      );
+    }
+    final skill = await createSkill(
+      name: draft.name,
+      description: draft.description,
+      instructions: draft.body,
+      triggers: draft.triggers,
+    );
+    await _prefs.setStringList(
+      _pendingKey,
+      drafts
+          .where((d) => d.id != id)
+          .map((d) => jsonEncode(d.toJson()))
+          .toList(),
+    );
+    return skill;
+  }
+
+  Future<void> rejectPending(String id) async {
+    final drafts = await listPending();
+    await _prefs.setStringList(
+      _pendingKey,
+      drafts
+          .where((d) => d.id != id)
+          .map((d) => jsonEncode(d.toJson()))
+          .toList(),
+    );
   }
 
   String _normalizeName(String raw) {

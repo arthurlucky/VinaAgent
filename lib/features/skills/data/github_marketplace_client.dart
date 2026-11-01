@@ -135,35 +135,51 @@ class GithubMarketplaceClient {
     MarketplaceSkill skill,
     SkillStore store,
   ) async {
-    final tree = await _tree(skill.source);
     final prefix = skill.directory.isEmpty ? '' : '${skill.directory}/';
-
-    final candidates = tree.files.where((file) {
-      if (prefix.isEmpty) return !file.path.contains('/');
-      return file.path.startsWith(prefix);
-    }).toList()
-      ..sort((a, b) => a.path.compareTo(b.path));
-
-    final selected = <_RepoFile>[];
-    var totalBytes = 0;
-    for (final file in candidates) {
-      if (selected.length >= _maxFilesPerSkill) break;
-      if (file.size > _maxFileBytes) continue;
-      if (totalBytes + file.size > _maxTotalBytes) break;
-      if (_isBinary(file.path)) continue;
-      selected.add(file);
-      totalBytes += file.size;
-    }
-
-    if (!selected.any((file) => file.path.endsWith('SKILL.md'))) {
-      throw MarketplaceException('Skill "${skill.slug}" has no SKILL.md.');
-    }
-
     final files = <String, String>{};
-    for (final file in selected) {
-      final relative =
-          prefix.isEmpty ? file.path : file.path.substring(prefix.length);
-      files[relative] = await _rawText(skill.source, tree.branch, file.path);
+    var branch = skill.branch.isEmpty ? 'main' : skill.branch;
+
+    try {
+      final tree = await _tree(
+        skill.source,
+        branch: skill.branch.isEmpty ? null : skill.branch,
+      );
+      branch = tree.branch;
+      final candidates = tree.files.where((file) {
+        if (prefix.isEmpty) return !file.path.contains('/');
+        return file.path.startsWith(prefix);
+      }).toList()
+        ..sort((a, b) => a.path.compareTo(b.path));
+
+      final selected = <_RepoFile>[];
+      var totalBytes = 0;
+      for (final file in candidates) {
+        if (selected.length >= _maxFilesPerSkill) break;
+        if (file.size > _maxFileBytes) continue;
+        if (totalBytes + file.size > _maxTotalBytes) break;
+        if (_isBinary(file.path)) continue;
+        selected.add(file);
+        totalBytes += file.size;
+      }
+
+      for (final file in selected) {
+        final relative =
+            prefix.isEmpty ? file.path : file.path.substring(prefix.length);
+        files[relative] = await _rawText(skill.source, tree.branch, file.path);
+      }
+    } catch (_) {
+      // GitHub's tree API is rate-limited anonymously; SKILL.md alone is
+      // enough to install and still works through raw.githubusercontent.com.
+    }
+
+    if (!files.containsKey('SKILL.md')) {
+      final skillPath =
+          prefix.isEmpty ? 'SKILL.md' : '${prefix}SKILL.md';
+      try {
+        files['SKILL.md'] = await _rawText(skill.source, branch, skillPath);
+      } catch (_) {
+        throw MarketplaceException('Skill "${skill.slug}" has no SKILL.md.');
+      }
     }
 
     return store.installSkill(
@@ -172,7 +188,7 @@ class GithubMarketplaceClient {
       metadata: {
         'source': skill.source.id,
         'directory': skill.directory,
-        'url': skill.source.url,
+        'url': skill.githubUrl.isEmpty ? skill.source.url : skill.githubUrl,
       },
     );
   }
@@ -200,9 +216,16 @@ class GithubMarketplaceClient {
     return MarketplaceSource.parse(id);
   }
 
-  Future<_RepoTree> _tree(MarketplaceSource source) async {
-    final cached = _treeCache[source.id];
-    final cachedAt = _treeCacheAt[source.id];
+  String _treeKey(MarketplaceSource source, String? branch) =>
+      '${source.id}@${branch ?? 'default'}';
+
+  Future<_RepoTree> _tree(
+    MarketplaceSource source, {
+    String? branch,
+  }) async {
+    final key = _treeKey(source, branch);
+    final cached = _treeCache[key];
+    final cachedAt = _treeCacheAt[key];
     if (cached != null &&
         cachedAt != null &&
         DateTime.now().difference(cachedAt) < _cacheTtl) {
@@ -210,13 +233,18 @@ class GithubMarketplaceClient {
     }
 
     try {
-      final repo = await _dio.get<Map<String, dynamic>>(
-        '$_api/repos/${source.owner}/${source.repo}',
-      );
-      final branch = repo.data?['default_branch'] as String? ?? 'main';
+      var resolvedBranch = branch;
+      if (resolvedBranch == null || resolvedBranch.isEmpty) {
+        final repo = await _dio.get<Map<String, dynamic>>(
+          '$_api/repos/${source.owner}/${source.repo}',
+        );
+        resolvedBranch =
+            repo.data?['default_branch'] as String? ?? 'main';
+      }
 
+      final branchName = resolvedBranch ?? 'main';
       final tree = await _dio.get<Map<String, dynamic>>(
-        '$_api/repos/${source.owner}/${source.repo}/git/trees/$branch',
+        '$_api/repos/${source.owner}/${source.repo}/git/trees/$branchName',
         queryParameters: const {'recursive': 1},
       );
 
@@ -232,9 +260,9 @@ class GithubMarketplaceClient {
         }
       }
 
-      final result = _RepoTree(branch, files);
-      _treeCache[source.id] = result;
-      _treeCacheAt[source.id] = DateTime.now();
+      final result = _RepoTree(branchName, files);
+      _treeCache[key] = result;
+      _treeCacheAt[key] = DateTime.now();
       return result;
     } on DioException catch (error) {
       throw MarketplaceException(_describe(error));

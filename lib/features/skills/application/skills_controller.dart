@@ -27,3 +27,14 @@ final skillsEnabledProvider = Provider<bool>((ref) {
   ref.watch(skillsProvider);
   return ref.watch(skillStoreProvider).globallyEnabled;
 });
+
+/// Drafts waiting for approval (auto-learned or AI-authored).
+final pendingSkillsProvider = FutureProvider<List<PendingSkill>>((ref) async {
+  return ref.watch(skillStoreProvider).listPending();
+});
+
+/// Whether Hermes-style auto-learning is enabled.
+final autoLearnSkillsProvider = Provider<bool>((ref) {
+  ref.watch(skillsProvider);
+  return ref.watch(skillStoreProvider).autoLearnEnabled;
+});

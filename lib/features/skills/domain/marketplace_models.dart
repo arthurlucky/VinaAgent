@@ -26,7 +26,9 @@ class MarketplaceSource {
   factory MarketplaceSource.parse(String value) {
     final parts = value.trim().split('/');
     if (parts.length != 2 || parts[0].isEmpty || parts[1].isEmpty) {
-      throw const FormatException('Use the owner/repo format, e.g. anthropics/skills');
+      throw const FormatException(
+        'Use the owner/repo format, e.g. anthropics/skills',
+      );
     }
     return MarketplaceSource(
       owner: parts[0].trim(),
@@ -37,13 +39,18 @@ class MarketplaceSource {
   }
 }
 
-/// A single skill discovered inside a marketplace source.
+/// A single skill discovered in the SkillsMP catalog.
 class MarketplaceSkill {
   const MarketplaceSkill({
     required this.source,
     required this.directory,
     required this.name,
     required this.description,
+    this.branch = 'main',
+    this.author = '',
+    this.stars = 0,
+    this.detailUrl = '',
+    this.githubUrl = '',
   });
 
   final MarketplaceSource source;
@@ -54,16 +61,34 @@ class MarketplaceSkill {
   final String name;
   final String description;
 
+  /// Branch named in the SkillsMP `githubUrl` (usually `main`/`master`).
+  final String branch;
+
+  final String author;
+  final int stars;
+
+  /// SkillsMP detail page.
+  final String detailUrl;
+
+  /// Exact GitHub tree/blob URL for this skill.
+  final String githubUrl;
+
   String get slug =>
       directory.isEmpty ? source.repo : directory.split('/').last;
 
-  String get id => '${source.id}/$slug';
+  String get id =>
+      '${source.id}/${directory.isEmpty ? source.repo : directory}';
 
   MarketplaceSkill withDescription(String value) => MarketplaceSkill(
         source: source,
         directory: directory,
         name: name,
         description: value,
+        branch: branch,
+        author: author,
+        stars: stars,
+        detailUrl: detailUrl,
+        githubUrl: githubUrl,
       );
 
   @override
@@ -73,8 +98,8 @@ class MarketplaceSkill {
   int get hashCode => id.hashCode;
 }
 
-/// Popular, public skill repositories. These are the upstreams that
-/// marketplaces such as skills.sh and ClawHub index.
+/// Popular, public skill repositories kept as an offline fallback when the
+/// SkillsMP API is unavailable.
 const List<MarketplaceSource> kFeaturedSkillSources = [
   MarketplaceSource(
     owner: 'anthropics',
@@ -96,39 +121,9 @@ const List<MarketplaceSource> kFeaturedSkillSources = [
     description: 'Brainstorming, TDD, debugging and planning workflows.',
   ),
   MarketplaceSource(
-    owner: 'mattpocock',
-    repo: 'skills',
-    title: 'Matt Pocock',
-    description: 'TypeScript, code review, TDD and refactoring skills.',
-  ),
-  MarketplaceSource(
     owner: 'microsoft',
     repo: 'azure-skills',
     title: 'Microsoft Azure',
     description: 'Azure diagnostics, cost, RBAC and deployment skills.',
-  ),
-  MarketplaceSource(
-    owner: 'supabase',
-    repo: 'agent-skills',
-    title: 'Supabase',
-    description: 'Postgres and Supabase best practices.',
-  ),
-  MarketplaceSource(
-    owner: 'prisma',
-    repo: 'skills',
-    title: 'Prisma',
-    description: 'Prisma ORM, migrations and database setup.',
-  ),
-  MarketplaceSource(
-    owner: 'remotion-dev',
-    repo: 'skills',
-    title: 'Remotion',
-    description: 'Programmatic video creation with React.',
-  ),
-  MarketplaceSource(
-    owner: 'emilkowalski',
-    repo: 'skills',
-    title: 'Emil Kowalski',
-    description: 'Animation and interface design craft.',
   ),
 ];

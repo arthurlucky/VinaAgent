@@ -70,3 +70,64 @@ class SkillFormatException implements Exception {
   @override
   String toString() => 'SkillFormatException: $message';
 }
+
+/// A skill draft waiting for the user's approval.
+///
+/// Auto-learned and AI-authored skills never become active immediately: they
+/// are stored here, scored by the quality gate, and only written to disk after
+/// an explicit approval in Settings → Agent Skills.
+class PendingSkill {
+  const PendingSkill({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.body,
+    required this.source,
+    required this.score,
+    required this.createdAt,
+    this.triggers = const [],
+    this.reason = '',
+  });
+
+  final String id;
+  final String name;
+  final String description;
+
+  /// Rendered markdown body (without YAML frontmatter).
+  final String body;
+  final List<String> triggers;
+
+  /// `auto`, `ai` or `agent`.
+  final String source;
+  final int score;
+  final DateTime createdAt;
+  final String reason;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'description': description,
+        'body': body,
+        'triggers': triggers,
+        'source': source,
+        'score': score,
+        'createdAt': createdAt.toIso8601String(),
+        'reason': reason,
+      };
+
+  factory PendingSkill.fromJson(Map<String, dynamic> json) => PendingSkill(
+        id: json['id'] as String? ?? '',
+        name: json['name'] as String? ?? '',
+        description: json['description'] as String? ?? '',
+        body: json['body'] as String? ?? '',
+        triggers: (json['triggers'] as List<dynamic>? ?? const [])
+            .map((e) => e.toString())
+            .toList(),
+        source: json['source'] as String? ?? 'ai',
+        score: (json['score'] as num?)?.toInt() ?? 0,
+        createdAt:
+            DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+                DateTime.now(),
+        reason: json['reason'] as String? ?? '',
+      );
+}

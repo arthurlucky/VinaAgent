@@ -1,6 +1,10 @@
 import '../../agent/domain/agent_tool.dart';
+import '../domain/agent_skill.dart';
+import '../domain/marketplace_models.dart';
 import 'github_marketplace_client.dart';
+import 'skill_quality_gate.dart';
 import 'skill_store.dart';
+import 'skillsmp_client.dart';
 
 /// Agent tools that expose the skill library.
 ///
@@ -13,16 +17,15 @@ class SkillTools {
   static List<AgentTool> all({
     required SkillStore store,
     GithubMarketplaceClient? marketplace,
+    SkillsMpClient? skillsMp,
   }) =>
       [
         listSkills(store),
         loadSkill(store),
         readSkillResource(store),
         createSkill(store),
-        if (marketplace != null) ...[
-          searchMarketplace(marketplace),
-          installMarketplaceSkill(marketplace, store),
-        ],
+        if (skillsMp != null) searchMarketplace(skillsMp),
+        if (marketplace != null) installMarketplaceSkill(marketplace, store),
       ];
 
   static AgentTool listSkills(SkillStore store) => AgentTool(
@@ -154,11 +157,12 @@ class SkillTools {
   static AgentTool createSkill(SkillStore store) => AgentTool(
         name: 'create_skill',
         description:
-            'Creates a new reusable skill (SKILL.md) on the device. Use when the '
-            'user asks to remember a workflow, or when you discover a repeatable '
-            'procedure worth reusing. Provide a kebab-case name, a description '
-            'that says what it does AND when to use it, and step-by-step '
-            'markdown instructions.',
+            'Drafts a new reusable skill (SKILL.md) and submits it to the '
+            'quality gate. Passing drafts are stored as PENDING and require '
+            'user approval in Settings → Agent Skills before activation. '
+            'Provide a kebab-case name, a description that says what it does '
+            'AND when to use it, and instructions with ## When to use, '
+            '## Steps (3+), ## Verification and ## Failure modes.',
         inputSchema: const {
           'type': 'object',
           'properties': {
@@ -175,40 +179,67 @@ class SkillTools {
               'type': 'string',
               'description': 'Markdown body with numbered workflow steps.',
             },
+            'triggers': {
+              'type': 'array',
+              'items': {'type': 'string'},
+              'description': 'Optional activation keywords (any language).',
+            },
           },
           'required': ['name', 'description', 'instructions'],
         },
         risk: ToolRisk.destructive,
         run: (args) async {
-          try {
-            final skill = await store.createSkill(
-              name: args['name'] as String? ?? '',
-              description: args['description'] as String? ?? '',
-              instructions: args['instructions'] as String? ?? '',
-            );
-            return 'Created skill "${skill.name}" at ${skill.directory}. '
-                'It is now listed in list_skills and will be offered to the '
-                'model on future runs.';
-          } catch (error) {
-            return 'Error creating skill: $error';
+          final triggers = (args['triggers'] as List<dynamic>? ?? const [])
+              .map((item) => item.toString())
+              .toList();
+          final draft = SkillDraft(
+            name: args['name'] as String? ?? '',
+            description: args['description'] as String? ?? '',
+            body: args['instructions'] as String? ?? '',
+            triggers: triggers,
+          );
+          final existing = await store.listSkills();
+          final report = SkillQualityGate.evaluate(draft, existing: existing);
+          if (report.errors.isNotEmpty) {
+            return 'Rejected by the skill quality gate '
+                '(score ${report.score}/100):\n'
+                '- ${report.errors.join('\n- ')}\n'
+                'Improve the draft and call create_skill again.';
           }
+
+          await store.addPending(PendingSkill(
+            id: 'pending-${DateTime.now().microsecondsSinceEpoch}',
+            name: draft.name,
+            description: draft.description,
+            body: draft.body,
+            triggers: draft.triggers,
+            source: 'agent',
+            score: report.score,
+            createdAt: DateTime.now(),
+            reason: 'Drafted by the agent during a run.',
+          ));
+          return 'Draft "${draft.name}" passed the quality gate '
+              '(score ${report.score}/100) and is waiting for approval in '
+              'Settings → Agent Skills. It is not active yet.';
         },
       );
 
-  static AgentTool searchMarketplace(GithubMarketplaceClient client) =>
-      AgentTool(
+  static AgentTool searchMarketplace(SkillsMpClient client) => AgentTool(
         name: 'search_skill_marketplace',
         description:
-            'Searches the public skill marketplace (GitHub repositories such as '
-            'anthropics/skills, obra/superpowers and vercel-labs/skills) for '
-            'installable skills. Use when the user wants a new capability or '
-            'asks what can be installed.',
+            'Searches SkillsMP (skillsmp.com), the public catalog of 3M+ Agent '
+            'Skills. Returns skill name, GitHub repository, folder, stars and '
+            'the exact github_url needed by install_marketplace_skill.',
         inputSchema: const {
           'type': 'object',
           'properties': {
             'query': {
               'type': 'string',
               'description': 'Search words, e.g. "pdf" or "code review".',
+            },
+            'limit': {
+              'type': 'integer',
+              'description': 'Optional result count (1-20).',
             },
           },
           'required': ['query'],
@@ -217,26 +248,33 @@ class SkillTools {
         run: (args) async {
           final query = (args['query'] as String? ?? '').trim();
           if (query.isEmpty) return 'Error: "query" is required.';
+          final rawLimit = args['limit'];
+          final limit = rawLimit is num ? rawLimit.toInt().clamp(1, 20) : 12;
 
           try {
-            final results = await client.search(query, limit: 15);
-            if (results.isEmpty) {
-              return 'No marketplace skills match "$query".';
+            final page = await client.search(query, limit: limit);
+            if (page.skills.isEmpty) {
+              return 'No SkillsMP skills match "$query".';
             }
 
-            final buffer = StringBuffer('Marketplace results for "$query":\n');
-            for (final skill in results) {
+            final buffer = StringBuffer('SkillsMP results for "$query":\n');
+            for (final skill in page.skills) {
               buffer.writeln(
-                '- ${skill.name} [${skill.source.id} / ${skill.slug}] '
-                '— ${skill.description}',
+                '- ${skill.name} by ${skill.author} '
+                '[${skill.source.id}/${skill.directory}] '
+                '★${skill.stars} — ${skill.description}',
               );
+              buffer.writeln('  github_url: ${skill.githubUrl}');
             }
             buffer.writeln(
-              '\nInstall one with install_marketplace_skill (source + slug).',
+              '\nInstall one with install_marketplace_skill '
+              '(github_url + name + description).',
             );
             return buffer.toString().trim();
+          } on SkillsMpException catch (error) {
+            return 'SkillsMP search failed: ${error.message}';
           } catch (error) {
-            return 'Marketplace search failed: $error';
+            return 'SkillsMP search failed: $error';
           }
         },
       );
@@ -248,34 +286,69 @@ class SkillTools {
       AgentTool(
         name: 'install_marketplace_skill',
         description:
-            'Downloads a skill from the public marketplace and installs it on '
-            'this device. Get source and slug from search_skill_marketplace '
-            'first. Installed skills become available to load_skill.',
+            'Downloads a skill from SkillsMP/GitHub and installs it on this '
+            'device. Prefer the exact github_url returned by '
+            'search_skill_marketplace. Installed skills become available to '
+            'load_skill.',
         inputSchema: const {
           'type': 'object',
           'properties': {
+            'github_url': {
+              'type': 'string',
+              'description':
+                  'Exact GitHub tree URL from SkillsMP, e.g. '
+                  '"https://github.com/owner/repo/tree/main/skills/pdf".',
+            },
+            'name': {
+              'type': 'string',
+              'description': 'Skill name from the search result.',
+            },
+            'description': {
+              'type': 'string',
+              'description': 'Short description from the search result.',
+            },
             'source': {
               'type': 'string',
-              'description': 'Repository, e.g. "anthropics/skills".',
+              'description':
+                  'Fallback repository "owner/repo" when github_url is absent.',
             },
             'slug': {
               'type': 'string',
-              'description': 'Skill slug, e.g. "pdf".',
+              'description': 'Fallback skill slug inside the repository.',
             },
           },
-          'required': ['source', 'slug'],
         },
         risk: ToolRisk.destructive,
         run: (args) async {
-          final source = (args['source'] as String? ?? '').trim();
+          final githubUrl = (args['github_url'] as String? ?? '').trim();
+          final sourceId = (args['source'] as String? ?? '').trim();
           final slug = (args['slug'] as String? ?? '').trim();
-          if (source.isEmpty || slug.isEmpty) {
-            return 'Error: both "source" and "slug" are required.';
-          }
 
           try {
-            final skill = await client.installBySlug(source, slug, store);
-            return 'Installed "${skill.name}" from $source. '
+            if (githubUrl.isNotEmpty) {
+              final parsed = SkillsMpClient.parseGithubUrl(githubUrl);
+              if (parsed == null) {
+                return 'Error: github_url is not a valid GitHub URL.';
+              }
+              final name = (args['name'] as String? ?? '').trim();
+              final skill = MarketplaceSkill(
+                source: parsed.source,
+                directory: parsed.directory,
+                branch: parsed.branch,
+                name: name.isEmpty ? parsed.directory.split('/').last : name,
+                description: (args['description'] as String? ?? '').trim(),
+                githubUrl: githubUrl,
+              );
+              final installed = await client.install(skill, store);
+              return 'Installed "${installed.name}" from ${skill.source.id}. '
+                  'It is now available to load_skill.';
+            }
+
+            if (sourceId.isEmpty || slug.isEmpty) {
+              return 'Error: provide github_url, or source + slug.';
+            }
+            final installed = await client.installBySlug(sourceId, slug, store);
+            return 'Installed "${installed.name}" from $sourceId. '
                 'It is now available to load_skill.';
           } catch (error) {
             return 'Install failed: $error';
