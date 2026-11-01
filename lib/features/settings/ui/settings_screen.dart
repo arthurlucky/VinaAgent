@@ -7,42 +7,10 @@ import 'package:pocketstrike/app/theme/glass_tokens.dart';
 import 'package:pocketstrike/app/theme/theme_controller.dart';
 import 'package:pocketstrike/shared/widgets/app_icons.dart';
 import 'package:pocketstrike/features/settings/ui/personas_sheet.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 /// Main settings menu grouping all app configurations into sleek glass tiles.
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
-
-  Future<void> _openUrl(BuildContext context, String urlString) async {
-    final uri = Uri.parse(urlString);
-    try {
-      final launched = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-      if (!launched) {
-        final fallbackLaunched = await launchUrl(
-          uri,
-          mode: LaunchMode.platformDefault,
-        );
-        if (!fallbackLaunched && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Could not open $urlString')),
-          );
-        }
-      }
-    } catch (e) {
-      try {
-        await launchUrl(uri);
-      } catch (err) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error opening link: $err')),
-          );
-        }
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -311,15 +279,13 @@ class _SectionHeader extends StatelessWidget {
 
 class _SettingsTile extends StatelessWidget {
   const _SettingsTile({
-    this.icon,
-    this.customLeading,
+    required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
   });
 
-  final IconData? icon;
-  final Widget? customLeading;
+  final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
@@ -344,22 +310,19 @@ class _SettingsTile extends StatelessWidget {
             ),
             child: Row(
               children: [
-                if (customLeading != null)
-                  customLeading!
-                else
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: tokens.accent.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: tokens.accent.withValues(alpha: 0.25),
-                        width: 0.8,
-                      ),
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: tokens.accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: tokens.accent.withValues(alpha: 0.25),
+                      width: 0.8,
                     ),
-                    child: Icon(icon, color: tokens.accent, size: 16),
                   ),
+                  child: Icon(icon, color: tokens.accent, size: 16),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -394,71 +357,6 @@ class _SettingsTile extends StatelessWidget {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _YouTubeLogo extends StatelessWidget {
-  const _YouTubeLogo();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 32,
-      height: 32,
-      decoration: BoxDecoration(
-        color: const Color(0xFFFF0000).withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: const Color(0xFFFF0000).withValues(alpha: 0.35),
-          width: 0.8,
-        ),
-      ),
-      child: Center(
-        child: Container(
-          width: 18,
-          height: 13,
-          decoration: BoxDecoration(
-            color: const Color(0xFFFF0000),
-            borderRadius: BorderRadius.circular(3),
-          ),
-          child: const Center(
-            child: Icon(
-              Icons.play_arrow_rounded,
-              size: 10,
-              color: Colors.white,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _GitHubLogo extends StatelessWidget {
-  const _GitHubLogo();
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.glass;
-    return Container(
-      width: 32,
-      height: 32,
-      decoration: BoxDecoration(
-        color: tokens.accent.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: tokens.accent.withValues(alpha: 0.25),
-          width: 0.8,
-        ),
-      ),
-      child: Center(
-        child: Icon(
-          Icons.code_rounded,
-          color: tokens.accent,
-          size: 16,
         ),
       ),
     );

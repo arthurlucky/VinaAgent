@@ -216,7 +216,7 @@ class _ArtifactViewerScreenState extends ConsumerState<ArtifactViewerScreen>
             tooltip: 'Copy version',
             icon: const Icon(Icons.copy_all_outlined),
             onPressed: () async {
-              final value = await content.whenData((v) => v).valueOrNull;
+              final value = content.whenData((v) => v).valueOrNull;
               if (value != null) await _copy(value);
             },
           ),

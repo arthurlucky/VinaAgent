@@ -27,11 +27,8 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
   }
 
   Future<void> _importFile() async {
-    final result = await FilePicker.platform.pickFiles();
-    if (result == null || result.files.isEmpty) return;
-
-    final file = result.files.first;
-    if (file.path == null) return;
+    final file = await FilePicker.pickFile();
+    if (file == null || file.path == null) return;
 
     try {
       final manager = ref.read(fileManagerProvider);
@@ -100,15 +97,6 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
     setState(() {
       _currentPath = folder.path;
       _breadcrumb.add(folder.name);
-    });
-  }
-
-  Future<void> _goToRoot() async {
-    final root = await ref.read(sandboxRootProvider.future);
-    setState(() {
-      _currentPath = root;
-      _breadcrumb.clear();
-      _breadcrumb.addAll(['Documents']);
     });
   }
 

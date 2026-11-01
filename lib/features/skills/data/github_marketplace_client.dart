@@ -242,7 +242,7 @@ class GithubMarketplaceClient {
             repo.data?['default_branch'] as String? ?? 'main';
       }
 
-      final branchName = resolvedBranch ?? 'main';
+      final branchName = resolvedBranch;
       final tree = await _dio.get<Map<String, dynamic>>(
         '$_api/repos/${source.owner}/${source.repo}/git/trees/$branchName',
         queryParameters: const {'recursive': 1},

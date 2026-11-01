@@ -153,7 +153,6 @@ class ProviderResolver {
     final key =
         await _ref.read(secureKeyStoreProvider).readProviderKey(config.id);
     final provider = ProviderRegistry.build(config, key);
-    if (provider == null) return null;
 
     var model = profile.model.trim();
     if (model.isEmpty) model = config.defaultModel.trim();

@@ -130,7 +130,7 @@ class AgentDelegation {
           params: await paramsFor(target.configId),
           tools: tools,
           policy: ConfirmationPolicy.autonomous,
-          requestConfirmation: (_, __) async => ConfirmResult.allow,
+          requestConfirmation: (_, _) async => ConfirmResult.allow,
         )) {
           if (event is AgentTextDeltaEvent) {
             buffer.write(event.text);
