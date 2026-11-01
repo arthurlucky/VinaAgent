@@ -8,8 +8,8 @@ import 'theme/app_theme.dart';
 import 'theme/theme_controller.dart';
 
 /// Root widget: animated glass theme + router.
-class PocketStrikeApp extends ConsumerWidget {
-  const PocketStrikeApp({super.key});
+class VinaAgentApp extends ConsumerWidget {
+  const VinaAgentApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -23,7 +23,7 @@ class PocketStrikeApp extends ConsumerWidget {
       themeMode: themeMode,
       builder: (context, light, dark) {
         return MaterialApp.router(
-          title: 'PocketStrike',
+          title: 'Vina Agent',
           debugShowCheckedModeBanner: false,
           theme: light,
           darkTheme: dark,

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:path/path.dart' as p;
+import 'package:pocketstrike/core/storage/app_sandbox.dart';
 import 'package:pocketstrike/features/agent/domain/agent_tool.dart';
 
 /// Sandboxed storage tools for agent file system operations on mobile devices.
@@ -20,50 +21,29 @@ class StorageAgentTools {
     ];
   }
 
-  /// Intelligent path resolver for mobile storage (e.g. Android /storage/emulated/0/Download).
-  static String _resolvePath(String rawPath) {
-    var pathStr = rawPath.trim();
-    if (pathStr.isEmpty || pathStr == '.' || pathStr == 'Download' || pathStr == 'Downloads' || pathStr == 'downloads') {
-      return '/storage/emulated/0/Download';
-    }
-    if (pathStr == 'Documents' || pathStr == 'documents') {
-      return '/storage/emulated/0/Documents';
-    }
-    if (pathStr.startsWith('~/')) {
-      return pathStr.replaceFirst('~/', '/storage/emulated/0/');
-    }
-    if (pathStr.startsWith('Download/') || pathStr.startsWith('Downloads/')) {
-      return pathStr.replaceFirst(RegExp(r'^Downloads?/'), '/storage/emulated/0/Download/');
-    }
-    if (pathStr.startsWith('Documents/')) {
-      return pathStr.replaceFirst('Documents/', '/storage/emulated/0/Documents/');
-    }
-    return pathStr;
+  /// Resolves a friendly sandbox path (e.g. "Downloads/notes.txt") into an
+  /// absolute path inside the app sandbox. Returns the raw value when the
+  /// sandbox has no roots; the caller then rejects it via [_isAllowed].
+  static String _resolvePath(String rawPath, List<String> allowedRoots) {
+    if (allowedRoots.isEmpty) return rawPath.trim();
+    return AppSandbox.resolveWithRoot(rawPath, allowedRoots.first) ??
+        rawPath.trim();
   }
 
   static bool _isAllowed(String targetPath, List<String> allowedRoots) {
-    if (allowedRoots.isEmpty) return true; // Default fallback to system access
-    final normalizedTarget = p.canonicalize(targetPath);
-    for (final root in allowedRoots) {
-      final normalizedRoot = p.canonicalize(root);
-      if (normalizedTarget == normalizedRoot ||
-          p.isWithin(normalizedRoot, normalizedTarget)) {
-        return true;
-      }
-    }
-    return false;
+    return AppSandbox.isAllowed(targetPath, allowedRoots);
   }
 
   static AgentTool listFiles(List<String> allowedRoots) => AgentTool(
         name: 'list_files',
         description:
-            'Lists files and directories at the specified path (e.g. "/storage/emulated/0/Download" or "Downloads").',
+            'Lists files and directories at the specified path (e.g. "Downloads" or "Documents/report.txt").',
         inputSchema: const {
           'type': 'object',
           'properties': {
             'path': {
               'type': 'string',
-              'description': 'Directory path to list (e.g. "Downloads" or "/storage/emulated/0/Download").',
+              'description': 'Directory path to list (e.g. "Downloads").',
             },
           },
           'required': ['path'],
@@ -71,7 +51,7 @@ class StorageAgentTools {
         risk: ToolRisk.safe,
         run: (args) async {
           final rawPath = args['path'] as String? ?? 'Downloads';
-          final path = _resolvePath(rawPath);
+          final path = _resolvePath(rawPath, allowedRoots);
 
           if (!_isAllowed(path, allowedRoots)) {
             return 'Error: Access denied. Path "$path" is outside allowed root folders.';
@@ -109,7 +89,7 @@ class StorageAgentTools {
         risk: ToolRisk.safe,
         run: (args) async {
           final rawPath = args['path'] as String? ?? '';
-          final path = _resolvePath(rawPath);
+          final path = _resolvePath(rawPath, allowedRoots);
 
           if (!_isAllowed(path, allowedRoots)) {
             return 'Error: Access denied. Path "$path" is outside allowed root folders.';
@@ -144,7 +124,7 @@ class StorageAgentTools {
         risk: ToolRisk.safe,
         run: (args) async {
           final rawPath = args['path'] as String? ?? '';
-          final path = _resolvePath(rawPath);
+          final path = _resolvePath(rawPath, allowedRoots);
           final content = args['content'] as String? ?? '';
 
           if (!_isAllowed(path, allowedRoots)) {
@@ -173,7 +153,7 @@ class StorageAgentTools {
         risk: ToolRisk.safe,
         run: (args) async {
           final rawPath = args['path'] as String? ?? '';
-          final path = _resolvePath(rawPath);
+          final path = _resolvePath(rawPath, allowedRoots);
 
           if (!_isAllowed(path, allowedRoots)) {
             return 'Error: Access denied. Path "$path" is outside allowed root folders.';
@@ -201,7 +181,7 @@ class StorageAgentTools {
         risk: ToolRisk.destructive,
         run: (args) async {
           final rawPath = args['path'] as String? ?? '';
-          final path = _resolvePath(rawPath);
+          final path = _resolvePath(rawPath, allowedRoots);
 
           if (!_isAllowed(path, allowedRoots)) {
             return 'Error: Access denied. Path "$path" is outside allowed root folders.';
@@ -238,8 +218,8 @@ class StorageAgentTools {
         },
         risk: ToolRisk.safe,
         run: (args) async {
-          final src = _resolvePath(args['sourcePath'] as String? ?? '');
-          final dst = _resolvePath(args['destinationPath'] as String? ?? '');
+          final src = _resolvePath(args['sourcePath'] as String? ?? '', allowedRoots);
+          final dst = _resolvePath(args['destinationPath'] as String? ?? '', allowedRoots);
           if (!_isAllowed(src, allowedRoots) || !_isAllowed(dst, allowedRoots)) {
             return 'Error: Access denied. Both source and destination must be inside allowed root folders.';
           }
@@ -303,8 +283,8 @@ class StorageAgentTools {
 
           for (final item in movesRaw) {
             if (item is! Map) continue;
-            final src = _resolvePath(item['sourcePath'] as String? ?? '');
-            final dst = _resolvePath(item['destinationPath'] as String? ?? '');
+            final src = _resolvePath(item['sourcePath'] as String? ?? '', allowedRoots);
+            final dst = _resolvePath(item['destinationPath'] as String? ?? '', allowedRoots);
             if (!_isAllowed(src, allowedRoots) || !_isAllowed(dst, allowedRoots)) {
               errors.add('Access denied for $src -> $dst');
               continue;
@@ -352,7 +332,7 @@ class StorageAgentTools {
           'properties': {
             'directory': {
               'type': 'string',
-              'description': 'Directory path to organize (e.g. "Downloads" or "/storage/emulated/0/Download").',
+              'description': 'Directory path to organize (e.g. "Downloads").',
             },
           },
           'required': ['directory'],
@@ -360,7 +340,7 @@ class StorageAgentTools {
         risk: ToolRisk.safe,
         run: (args) async {
           final rawPath = args['directory'] as String? ?? 'Downloads';
-          final dirPath = _resolvePath(rawPath);
+          final dirPath = _resolvePath(rawPath, allowedRoots);
 
           if (!_isAllowed(dirPath, allowedRoots)) {
             return 'Error: Access denied. Path "$dirPath" is outside allowed root folders.';
@@ -456,7 +436,7 @@ class StorageAgentTools {
         risk: ToolRisk.safe,
         run: (args) async {
           final rawPath = args['directory'] as String? ?? 'Downloads';
-          final dirPath = _resolvePath(rawPath);
+          final dirPath = _resolvePath(rawPath, allowedRoots);
           final query = (args['query'] as String? ?? '').toLowerCase();
 
           if (!_isAllowed(dirPath, allowedRoots)) {

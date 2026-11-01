@@ -37,6 +37,15 @@ extension ConfirmationPolicyX on ConfirmationPolicy {
         ConfirmationPolicy.autonomous => 'Autonomous (no confirmations)',
       };
 
+  String get description => switch (this) {
+        ConfirmationPolicy.alwaysAsk =>
+          'Confirm every tool call before it runs.',
+        ConfirmationPolicy.destructiveOnly =>
+          'Auto-run safe tools; confirm external and destructive actions.',
+        ConfirmationPolicy.autonomous =>
+          'Never pause. Use only when you trust the current task.',
+      };
+
   static ConfirmationPolicy fromId(String? id) => switch (id) {
         'alwaysAsk' => ConfirmationPolicy.alwaysAsk,
         'autonomous' => ConfirmationPolicy.autonomous,

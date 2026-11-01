@@ -43,7 +43,7 @@ class GithubMarketplaceClient {
                 receiveTimeout: const Duration(seconds: 25),
                 headers: const {
                   'Accept': 'application/vnd.github+json',
-                  'User-Agent': 'PocketStrike-Skill-Marketplace',
+                  'User-Agent': 'Vina-Agent-Skill-Marketplace',
                 },
               ),
             );

@@ -112,7 +112,7 @@ class _AppDrawerState extends ConsumerState<AppDrawer> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'PocketStrike',
+                          'Vina Agent',
                           style: Theme.of(context)
                               .textTheme
                               .titleMedium

@@ -1,10 +1,9 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocketstrike/app/theme/glass_tokens.dart';
+import 'package:pocketstrike/core/storage/app_sandbox.dart';
 import 'package:pocketstrike/core/storage/prefs_provider.dart';
 import 'package:pocketstrike/shared/widgets/app_icons.dart';
-import 'package:pocketstrike/shared/widgets/glass_button.dart';
 import 'package:pocketstrike/features/agent/domain/agent_tool.dart';
 
 class StorageSettingsScreen extends ConsumerStatefulWidget {
@@ -15,9 +14,7 @@ class StorageSettingsScreen extends ConsumerStatefulWidget {
       _StorageSettingsScreenState();
 }
 
-class _StorageSettingsScreenState
-    extends ConsumerState<StorageSettingsScreen> {
-  final List<String> _allowedFolders = [];
+class _StorageSettingsScreenState extends ConsumerState<StorageSettingsScreen> {
   late ConfirmationPolicy _policy = ConfirmationPolicy.destructiveOnly;
 
   @override
@@ -28,31 +25,16 @@ class _StorageSettingsScreenState
 
   void _load() {
     final prefs = ref.read(sharedPreferencesProvider);
-    final storedFolders = prefs.getStringList('storage_allowed_folders') ?? [];
-    final storedPolicy = prefs.getString('confirm_policy');
     setState(() {
-      _allowedFolders.addAll(storedFolders);
-      _policy = ConfirmationPolicyX.fromId(storedPolicy);
+      _policy = ConfirmationPolicyX.fromId(prefs.getString('confirm_policy'));
     });
   }
 
-  Future<void> _pickFolder() async {
-    final path = await FilePicker.getDirectoryPath();
-    if (path != null && !_allowedFolders.contains(path)) {
-      setState(() => _allowedFolders.add(path));
-      await _save();
-    }
-  }
-
-  Future<void> _removeFolder(String path) async {
-    setState(() => _allowedFolders.remove(path));
-    await _save();
-  }
-
-  Future<void> _save() async {
-    final prefs = ref.read(sharedPreferencesProvider);
-    await prefs.setStringList('storage_allowed_folders', _allowedFolders);
-    await prefs.setString('confirm_policy', _policy.id);
+  Future<void> _savePolicy(ConfirmationPolicy policy) async {
+    setState(() => _policy = policy);
+    await ref
+        .read(sharedPreferencesProvider)
+        .setString('confirm_policy', policy.id);
   }
 
   @override
@@ -69,7 +51,6 @@ class _StorageSettingsScreenState
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Storage Sandboxing Info
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -82,24 +63,72 @@ class _StorageSettingsScreenState
               children: [
                 Row(
                   children: [
-                    Icon(AppIcons.shieldCheck,
-                        color: tokens.accent, size: 20),
+                    Icon(AppIcons.shieldCheck, color: tokens.accent, size: 20),
                     const SizedBox(width: 8),
-                    Text('Storage Access Framework (SAF)',
-                        style: Theme.of(context).textTheme.titleMedium),
+                    Text(
+                      'App Sandbox Only',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                   ],
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Text(
-                  'The PocketStrike agent can only read, write, or list files inside '
-                  'explicitly permitted root folders. Full device storage is never accessed.',
-                  style: TextStyle(color: tokens.textSecondary),
+                  'Vina Agent can only read, write, list, move and delete files '
+                  'inside its private app sandbox. Device storage, /sdcard and '
+                  'shared folders are never exposed to the agent.',
+                  style: TextStyle(color: tokens.textSecondary, height: 1.45),
+                ),
+                const SizedBox(height: 12),
+                FutureBuilder<String>(
+                  future: AppSandbox.root().then((d) => d.path),
+                  builder: (context, snapshot) {
+                    final path = snapshot.data ?? 'Preparing sandbox…';
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: tokens.secondary.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(tokens.radiusSm),
+                        border: Border.all(
+                          color: tokens.secondary.withValues(alpha: 0.55),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Sandbox root',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: tokens.textSecondary,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          SelectableText(
+                            path,
+                            style: TextStyle(
+                              color: tokens.textSecondary,
+                              fontSize: 12,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Folders: Documents · Downloads · Artifacts · Exports · Skills',
+                  style: TextStyle(color: tokens.textSecondary, fontSize: 12),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-
+          const SizedBox(height: 20),
           Text(
             'CONFIRMATION SAFETY LEVEL',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -123,62 +152,16 @@ class _StorageSettingsScreenState
               ),
               child: ListTile(
                 title: Text(p.label),
+                subtitle: Text(
+                  p.description,
+                  style: TextStyle(color: tokens.textSecondary, fontSize: 12),
+                ),
                 trailing: _policy == p
                     ? Icon(AppIcons.checkCircle2, color: tokens.accent)
                     : null,
-                onTap: () {
-                  setState(() => _policy = p);
-                  _save();
-                },
+                onTap: () => _savePolicy(p),
               ),
             ),
-          const SizedBox(height: 16),
-
-          Text(
-            'ALLOWED ROOT FOLDERS (${_allowedFolders.length})',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.8,
-                  color: tokens.textSecondary,
-                ),
-          ),
-          const SizedBox(height: 8),
-
-          if (_allowedFolders.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                'No external folders added. Default app sandbox will be used.',
-                style: TextStyle(color: tokens.textSecondary),
-              ),
-            )
-          else
-            for (final folder in _allowedFolders)
-              Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
-                  color: tokens.glassColor,
-                  borderRadius: BorderRadius.circular(tokens.radiusSm),
-                  border: Border.all(color: tokens.glassBorder),
-                ),
-                child: ListTile(
-                  leading: Icon(AppIcons.folder, color: tokens.accent),
-                  title: Text(folder, overflow: TextOverflow.ellipsis),
-                  trailing: IconButton(
-                    icon: const Icon(AppIcons.trash2,
-                        color: Colors.redAccent),
-                    onPressed: () => _removeFolder(folder),
-                  ),
-                ),
-              ),
-
-          const SizedBox(height: 12),
-          GlassButton(
-            label: 'Add Allowed Root Folder',
-            icon: AppIcons.folderPlus,
-            expanded: true,
-            onPressed: _pickFolder,
-          ),
         ],
       ),
     );

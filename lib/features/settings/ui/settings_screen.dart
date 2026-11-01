@@ -97,6 +97,12 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => context.push(AppRoutes.settingsMcp),
           ),
           _SettingsTile(
+            icon: Icons.travel_explore,
+            title: 'Web Search',
+            subtitle: 'Tavily, Brave, Serper, Exa or DuckDuckGo backend',
+            onTap: () => context.push(AppRoutes.settingsWebSearch),
+          ),
+          _SettingsTile(
             icon: AppIcons.wrench,
             title: 'Agent Tools & Capabilities',
             subtitle: 'Filesystem, web search, calculator, code sandbox',
@@ -120,7 +126,7 @@ class SettingsScreen extends ConsumerWidget {
           _SettingsTile(
             icon: AppIcons.folder,
             title: 'Storage & Permissions',
-            subtitle: 'SAF root folders & safety confirmation policy',
+            subtitle: 'App sandbox boundary & safety confirmation policy',
             onTap: () => context.push('/settings/storage'),
           ),
           _SettingsTile(

@@ -6,19 +6,23 @@ import 'device_tools.dart';
 import 'document_tools.dart';
 import 'extra_agent_tools.dart';
 import 'storage_tools.dart';
+import '../../web/data/web_search_service.dart';
 
 /// Safe built-in tools available to the agent out of the box.
 class BuiltInTools {
   const BuiltInTools._();
 
-  static List<AgentTool> all({List<String> allowedRoots = const []}) => [
+  static List<AgentTool> all({
+    List<String> allowedRoots = const [],
+    required WebSearchService webSearch,
+  }) => [
         currentTime(),
         calculator(),
         ...DeviceAgentTools.all(),
         ...AndroidAutomationTools.all(),
-        ...DocumentAgentTools.all(),
+        ...DocumentAgentTools.all(allowedRoots: allowedRoots),
         ...StorageAgentTools.tools(allowedRoots: allowedRoots),
-        ...ExtraAgentTools.all(),
+        ...ExtraAgentTools.all(webSearch: webSearch),
       ];
 
   static AgentTool currentTime() => AgentTool(

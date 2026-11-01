@@ -136,7 +136,7 @@ class AboutExportScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Text('PocketStrike',
+                Text('Vina Agent',
                     style: Theme.of(context).textTheme.headlineMedium),
                 const SizedBox(height: 4),
                 Text('Version 1.0.0 (Build 1)',
@@ -211,7 +211,7 @@ class AboutExportScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'PocketStrike AI Assistant & Workstation',
+                            'Vina Agent · AI Assistant & Workstation',
                             style: TextStyle(
                               fontSize: 11.5,
                               color: tokens.textSecondary,

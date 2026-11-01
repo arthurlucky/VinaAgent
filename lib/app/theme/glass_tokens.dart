@@ -15,6 +15,8 @@ class GlassTokens extends ThemeExtension<GlassTokens> {
     required this.accent,
     required this.accentPressed,
     required this.onAccent,
+    required this.secondary,
+    required this.onSecondary,
     required this.textSecondary,
     required this.terminalSurface,
     required this.softShadow,
@@ -36,6 +38,8 @@ class GlassTokens extends ThemeExtension<GlassTokens> {
   final Color accent;
   final Color accentPressed;
   final Color onAccent;
+  final Color secondary;
+  final Color onSecondary;
   final Color textSecondary;
   final Color terminalSurface;
   final List<BoxShadow> softShadow;
@@ -49,7 +53,9 @@ class GlassTokens extends ThemeExtension<GlassTokens> {
         radiusLg: 20,
         accent: AppPalette.darkAccent,
         accentPressed: AppPalette.darkAccentPressed,
-        onAccent: const Color(0xFF000000),
+        onAccent: const Color(0xFF160C24),
+        secondary: AppPalette.darkSecondary,
+        onSecondary: AppPalette.darkOnSecondary,
         textSecondary: AppPalette.darkTextSecondary,
         terminalSurface: AppPalette.terminalDark,
         softShadow: [
@@ -71,6 +77,8 @@ class GlassTokens extends ThemeExtension<GlassTokens> {
         accent: AppPalette.lightAccent,
         accentPressed: AppPalette.lightAccentPressed,
         onAccent: Colors.white,
+        secondary: AppPalette.lightSecondary,
+        onSecondary: AppPalette.lightOnSecondary,
         textSecondary: AppPalette.lightTextSecondary,
         terminalSurface: AppPalette.terminalLight,
         softShadow: [
@@ -93,6 +101,8 @@ class GlassTokens extends ThemeExtension<GlassTokens> {
     Color? accent,
     Color? accentPressed,
     Color? onAccent,
+    Color? secondary,
+    Color? onSecondary,
     Color? textSecondary,
     Color? terminalSurface,
     List<BoxShadow>? softShadow,
@@ -107,6 +117,8 @@ class GlassTokens extends ThemeExtension<GlassTokens> {
       accent: accent ?? this.accent,
       accentPressed: accentPressed ?? this.accentPressed,
       onAccent: onAccent ?? this.onAccent,
+      secondary: secondary ?? this.secondary,
+      onSecondary: onSecondary ?? this.onSecondary,
       textSecondary: textSecondary ?? this.textSecondary,
       terminalSurface: terminalSurface ?? this.terminalSurface,
       softShadow: softShadow ?? this.softShadow,
@@ -126,6 +138,8 @@ class GlassTokens extends ThemeExtension<GlassTokens> {
       accent: Color.lerp(accent, other.accent, t)!,
       accentPressed: Color.lerp(accentPressed, other.accentPressed, t)!,
       onAccent: Color.lerp(onAccent, other.onAccent, t)!,
+      secondary: Color.lerp(secondary, other.secondary, t)!,
+      onSecondary: Color.lerp(onSecondary, other.onSecondary, t)!,
       textSecondary: Color.lerp(textSecondary, other.textSecondary, t)!,
       terminalSurface:
           Color.lerp(terminalSurface, other.terminalSurface, t)!,

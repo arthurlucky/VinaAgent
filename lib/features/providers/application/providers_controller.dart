@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/db/app_database.dart';
 import '../../../core/db/daos.dart';
 import '../../../core/models/chat_models.dart';
+import '../../../core/storage/app_sandbox.dart';
 import '../../../core/storage/secure_keys.dart';
 import '../../agent/data/built_in_tools.dart';
 import '../../agent/data/cron_task_store.dart';
@@ -18,6 +19,7 @@ import '../../mcp/data/mcp_connection_manager.dart';
 import '../../skills/application/marketplace_controller.dart';
 import '../../skills/application/skills_controller.dart';
 import '../../skills/data/skill_tools.dart';
+import '../../web/application/web_search_controller.dart';
 import '../data/mock_provider.dart';
 import '../data/provider_registry.dart';
 import '../domain/ai_provider.dart';
@@ -90,11 +92,15 @@ class ProviderResolver {
 
     final skillStore = _ref.read(skillStoreProvider);
     await skillStore.ensureSeeded();
+    final sandboxRoots = await AppSandbox.roots();
 
     return [
       ...hermesTools,
       ...cronTools,
-      ...BuiltInTools.all(),
+      ...BuiltInTools.all(
+        allowedRoots: sandboxRoots,
+        webSearch: _ref.read(webSearchServiceProvider),
+      ),
       ...SkillTools.all(
         store: skillStore,
         marketplace: _ref.read(marketplaceClientProvider),

@@ -1,93 +1,50 @@
-import 'package:dio/dio.dart';
 import 'package:pocketstrike/features/agent/domain/agent_tool.dart';
 import 'package:pocketstrike/features/local_models/data/local_model_engine.dart';
+import 'package:pocketstrike/features/web/data/web_search_service.dart';
 
 /// Extra agent tools: Web Search, Code Execution Sandbox, and AI Image Generation.
 class ExtraAgentTools {
   const ExtraAgentTools._();
 
-  static List<AgentTool> all() => [webSearch(), codeSandbox(), generateImage()];
+  static List<AgentTool> all({required WebSearchService webSearch}) => [
+        webSearchTool(webSearch),
+        codeSandbox(),
+        generateImage(),
+      ];
 
-  static AgentTool webSearch() => AgentTool(
+  static AgentTool webSearchTool(WebSearchService service) => AgentTool(
         name: 'web_search',
         description:
-            'Searches the web for up-to-date live information, news, weather, and facts.',
+            'Searches the live web for current information, news, weather and '
+            'facts. The search backend (Tavily, Brave, Serper, Exa or '
+            'DuckDuckGo) is configured by the user in Settings → Web Search.',
         inputSchema: const {
           'type': 'object',
           'properties': {
             'query': {
               'type': 'string',
-              'description': 'Search query string (e.g. "latest tech news").',
+              'description': 'Search query string.',
+            },
+            'max_results': {
+              'type': 'integer',
+              'description': 'Optional number of results (1-10).',
             },
           },
           'required': ['query'],
         },
-        risk: ToolRisk.safe,
+        risk: ToolRisk.external,
         run: (args) async {
-          final query = args['query'] as String? ?? '';
-          if (query.trim().isEmpty) return 'Error: Query cannot be empty.';
-
+          final query = (args['query'] as String? ?? '').trim();
+          if (query.isEmpty) return 'Error: Query cannot be empty.';
+          final rawLimit = args['max_results'];
+          final limit = rawLimit is num ? rawLimit.toInt() : null;
           try {
-            final dio = Dio(BaseOptions(
-              connectTimeout: const Duration(seconds: 8),
-              receiveTimeout: const Duration(seconds: 8),
-            ));
-
-            // 1. Try DuckDuckGo HTML search for live snippets & news
-            final response = await dio.get(
-              'https://html.duckduckgo.com/html/',
-              queryParameters: {'q': query},
-              options: Options(
-                headers: {
-                  'User-Agent':
-                      'Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-                },
-              ),
-            );
-
-            final html = response.data.toString();
-            final matches = RegExp(r'<a class="result__snippet[^>]*>(.*?)<\/a>', dotAll: true)
-                .allMatches(html);
-
-            final buffer = StringBuffer();
-            buffer.writeln('Live web search results for "$query":\n');
-            int count = 0;
-            for (final m in matches) {
-              final snippet = m
-                  .group(1)
-                  ?.replaceAll(RegExp(r'<[^>]*>'), '')
-                  .replaceAll('&quot;', '"')
-                  .replaceAll('&amp;', '&')
-                  .trim();
-              if (snippet != null && snippet.isNotEmpty) {
-                count++;
-                buffer.writeln('$count. $snippet\n');
-                if (count >= 5) break;
-              }
-            }
-
-            if (count > 0) return buffer.toString().trim();
-
-            // 2. Fallback: DuckDuckGo Instant Answer API
-            final apiResp = await dio.get(
-              'https://api.duckduckgo.com/',
-              queryParameters: {
-                'q': query,
-                'format': 'json',
-                'no_html': '1',
-              },
-            );
-
-            if (apiResp.data is Map<String, dynamic>) {
-              final abstractText = apiResp.data['AbstractText'] as String? ?? '';
-              if (abstractText.isNotEmpty) {
-                return 'Web search result for "$query":\n$abstractText';
-              }
-            }
-
-            return 'Web search completed for "$query".';
+            final response = await service.search(query, maxResults: limit);
+            return response.toPrompt();
+          } on WebSearchException catch (e) {
+            return 'Web search failed: ${e.message}';
           } catch (e) {
-            return 'Web search failed for "$query": ${e.toString()}';
+            return 'Web search failed: $e';
           }
         },
       );

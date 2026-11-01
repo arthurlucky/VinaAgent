@@ -32,6 +32,18 @@ class SecureKeyStore {
 
   Future<void> deleteTelegramToken() => _storage.delete(key: _telegramTokenKey);
 
+  static String _webSearchKey(String providerId) =>
+      'websearch_key_$providerId';
+
+  Future<String?> readWebSearchKey(String providerId) =>
+      _storage.read(key: _webSearchKey(providerId));
+
+  Future<void> writeWebSearchKey(String providerId, String key) =>
+      _storage.write(key: _webSearchKey(providerId), value: key);
+
+  Future<void> deleteWebSearchKey(String providerId) =>
+      _storage.delete(key: _webSearchKey(providerId));
+
   static String _mcpHeadersKey(String serverId) => 'mcp_headers_$serverId';
 
   Future<String?> readMcpHeaders(String serverId) =>
