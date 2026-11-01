@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocketstrike/app/theme/glass_tokens.dart';
 import 'package:pocketstrike/features/artifacts/application/artifacts_controller.dart';
 import 'package:pocketstrike/features/artifacts/domain/artifact.dart';
-import 'package:pocketstrike/features/artifacts/ui/html_artifact_viewer.dart';
 
 /// Browse versioned artifacts created by the agent.
 class ArtifactsScreen extends ConsumerWidget {
@@ -282,7 +281,42 @@ class _PreviewTab extends StatelessWidget {
       );
     }
     if (artifact.type == 'html') {
-      return HtmlArtifactViewer(artifact: artifact, htmlContent: content);
+      return ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Theme.of(context)
+                  .colorScheme
+                  .surfaceContainerHighest
+                  .withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'HTML artifact — tap Code tab to view/copy source',
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: content));
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Copied to clipboard')),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.copy, size: 16),
+                  label: const Text('Copy'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
     }
     return ListView(
       padding: const EdgeInsets.all(16),
