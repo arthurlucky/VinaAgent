@@ -65,26 +65,49 @@ class AgentWorkdirNotifier extends StateNotifier<String> {
   Future<String> resolveAgentPath(String rawPath) async {
     final rootDir = await AppSandbox.root();
     final rootPath = rootDir.path;
+    final rootNorm = p.canonicalize(rootPath);
     final trimmed = rawPath.trim().replaceAll('\\', '/');
+    if (trimmed.isEmpty) return rootNorm;
 
-    // Leading slash or absolute inside root -> resolve directly against root
-    if (trimmed.startsWith('/') || trimmed.startsWith(rootPath)) {
-      final stripped = trimmed.replaceFirst(RegExp(r'^/+'), '');
-      return AppSandbox.resolveWithRoot(stripped, rootPath) ??
-          p.join(rootPath, stripped);
+    // Absolute paths are resolved against the sandbox exactly once. Stripping
+    // the leading slash here used to duplicate the sandbox prefix and write
+    // files to a hidden nested folder.
+    if (trimmed == '/root' || trimmed.startsWith('/root/')) {
+      final relative =
+          trimmed.substring('/root'.length).replaceFirst(RegExp(r'^/+'), '');
+      return AppSandbox.resolveWithRoot(relative, rootNorm) ?? rootNorm;
+    }
+    if (trimmed.startsWith('/') || trimmed.startsWith(rootNorm)) {
+      if (!trimmed.startsWith(rootNorm)) {
+        final friendly = RegExp(
+          r'^/+(Documents|Downloads|Artifacts|Exports|Skills|Plugins)(/|$)',
+          caseSensitive: false,
+        );
+        if (!friendly.hasMatch(trimmed)) {
+          throw StateError(
+            'Access denied: "$rawPath" is outside the app sandbox. '
+            'Use a relative path such as "Documents/file.txt".',
+          );
+        }
+      }
+      return AppSandbox.resolveWithRoot(trimmed, rootNorm) ?? rootNorm;
+    }
+
+    var relative = trimmed.replaceFirst(RegExp(r'^(?:\./)+'), '');
+    if (relative == 'root') relative = '';
+    if (relative.startsWith('root/')) {
+      relative = relative.substring('root/'.length);
     }
 
     // Relative path with an active workdir
     final wd = relativeWorkdir;
     if (wd.isNotEmpty) {
-      final combined = p.join(wd, trimmed);
-      return AppSandbox.resolveWithRoot(combined, rootPath) ??
-          p.join(rootPath, combined);
+      final combined = p.join(wd, relative);
+      return AppSandbox.resolveWithRoot(combined, rootNorm) ?? rootNorm;
     }
 
     // Default: relative to sandbox root
-    return AppSandbox.resolveWithRoot(trimmed, rootPath) ??
-        p.join(rootPath, trimmed);
+    return AppSandbox.resolveWithRoot(relative, rootNorm) ?? rootNorm;
   }
 
   /// Lists all top-level directories available in sandbox root.

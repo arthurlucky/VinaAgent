@@ -7,6 +7,7 @@ import 'package:pocketstrike/core/storage/prefs_provider.dart';
 import 'package:pocketstrike/core/storage/secure_keys.dart';
 import 'package:pocketstrike/features/conversations/application/conversations_controller.dart';
 import 'package:pocketstrike/features/chat/application/chat_controller.dart';
+import 'package:pocketstrike/features/chat/application/run_registry.dart';
 import 'package:pocketstrike/features/providers/application/providers_controller.dart';
 
 enum TelegramBridgeStatus { disabled, polling, error }
@@ -309,6 +310,14 @@ class TelegramServiceNotifier extends Notifier<TelegramServiceState> {
     try {
       // Execute message generation via ChatController
       await ref.read(chatControllerProvider.notifier).sendMessage(text: trimmed);
+
+      // If the agent was busy, the message was queued. Wait for the queue to
+      // drain so the reply below belongs to this message.
+      final deadline = DateTime.now().add(const Duration(minutes: 5));
+      while (ref.read(chatRunRegistryProvider).isRunning(convId) &&
+          DateTime.now().isBefore(deadline)) {
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+      }
 
       // Check for controller error
       final chatState = ref.read(chatControllerProvider);

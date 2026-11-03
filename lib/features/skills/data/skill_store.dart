@@ -51,6 +51,12 @@ class SkillStore {
 
   final SharedPreferences _prefs;
 
+  /// Extra skill roots contributed by enabled plugins.
+  ///
+  /// Populated by the plugin controller at startup. Plugin skills are read-only
+  /// from the normal skill library's point of view.
+  static final List<Directory> extraRoots = [];
+
   /// Master switch for the whole skill system.
   bool get globallyEnabled => _prefs.getBool(_globalEnabledKey) ?? true;
 
@@ -112,12 +118,18 @@ class SkillStore {
 
   /// All skills currently installed on the device.
   Future<List<AgentSkill>> listSkills() async {
-    final root = await _root();
+    final roots = <Directory>[await _root(), ...extraRoots];
     final skills = <AgentSkill>[];
-    await for (final entity in root.list(followLinks: false)) {
-      if (entity is! Directory) continue;
-      final skill = await _readSkill(entity);
-      if (skill != null) skills.add(skill);
+    final seen = <String>{};
+    for (final root in roots) {
+      if (!await root.exists()) continue;
+      await for (final entity in root.list(followLinks: false)) {
+        if (entity is! Directory) continue;
+        final skill = await _readSkill(entity);
+        if (skill == null) continue;
+        if (!seen.add(skill.directory)) continue;
+        skills.add(skill);
+      }
     }
     skills.sort((a, b) => a.name.compareTo(b.name));
     return skills;
@@ -128,13 +140,15 @@ class SkillStore {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return null;
 
-    final root = await _root();
     final normalized = _normalizeName(trimmed);
     if (_validName.hasMatch(normalized)) {
-      final dir = Directory(p.join(root.path, normalized));
-      if (await dir.exists()) {
-        final skill = await _readSkill(dir);
-        if (skill != null) return skill;
+      final roots = <Directory>[await _root(), ...extraRoots];
+      for (final root in roots) {
+        final dir = Directory(p.join(root.path, normalized));
+        if (await dir.exists()) {
+          final skill = await _readSkill(dir);
+          if (skill != null) return skill;
+        }
       }
     }
 
@@ -342,6 +356,13 @@ class SkillStore {
   Future<void> deleteSkill(String name) async {
     final skill = await findSkill(name);
     if (skill == null) return;
+    final mainRoot = p.canonicalize((await _root()).path);
+    final target = p.canonicalize(skill.directory);
+    if (!p.isWithin(mainRoot, target)) {
+      throw SkillFormatException(
+        'Skill "$name" belongs to a plugin. Disable or remove the plugin instead.',
+      );
+    }
     await Directory(skill.directory).delete(recursive: true);
     await _prefs.remove('$_enabledPrefix$name');
   }

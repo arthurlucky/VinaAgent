@@ -10,9 +10,28 @@ class AgentProfileStore {
 
   final SharedPreferences _prefs;
 
+  /// Extra profiles contributed by enabled plugins (read-only here).
+  static final List<AgentProfile> extraProfiles = [];
+
   static const String _key = 'agent_profiles_v1';
 
   Future<List<AgentProfile>> list() async {
+    final stored = await _readStored();
+    if (extraProfiles.isEmpty) return stored;
+
+    final merged = [...stored];
+    for (final extra in extraProfiles) {
+      final index = merged.indexWhere((profile) => profile.id == extra.id);
+      if (index >= 0) {
+        merged[index] = extra;
+      } else {
+        merged.add(extra);
+      }
+    }
+    return merged;
+  }
+
+  Future<List<AgentProfile>> _readStored() async {
     final raw = _prefs.getString(_key);
     if (raw == null) {
       final defaults = AgentProfile.defaults();
@@ -34,7 +53,7 @@ class AgentProfileStore {
   }
 
   Future<void> save(AgentProfile profile) async {
-    final profiles = await list();
+    final profiles = await _readStored();
     final index = profiles.indexWhere((item) => item.id == profile.id);
     if (index >= 0) {
       profiles[index] = profile;
@@ -45,7 +64,7 @@ class AgentProfileStore {
   }
 
   Future<void> delete(String id) async {
-    final profiles = await list();
+    final profiles = await _readStored();
     profiles.removeWhere((profile) => profile.id == id);
     await _write(profiles);
   }

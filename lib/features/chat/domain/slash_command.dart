@@ -54,13 +54,21 @@ const List<SlashCommand> kSlashCommands = [
     description: 'Open Background Process & Task Manager',
     aliases: ['ps', 'process'],
   ),
+  SlashCommand(
+    name: 'btw',
+    description:
+        'Ask a quick side question without touching the conversation: /btw <question>',
+  ),
 ];
 
 /// Commands matching what the user has typed so far.
 ///
 /// Returns an empty list once the command token is complete and a space has
 /// been typed, so the popup does not cover the composer while writing args.
-List<SlashCommand> slashCommandSuggestions(String input) {
+List<SlashCommand> slashCommandSuggestions(
+  String input, {
+  List<SlashCommand> extra = const [],
+}) {
   final text = input.trimLeft();
   if (!text.startsWith('/')) return const [];
 
@@ -68,5 +76,7 @@ List<SlashCommand> slashCommandSuggestions(String input) {
   if (token.contains(RegExp(r'\s'))) return const [];
 
   final needle = token.toLowerCase();
-  return kSlashCommands.where((command) => command.matches(needle)).toList();
+  return [...kSlashCommands, ...extra]
+      .where((command) => command.matches(needle))
+      .toList();
 }

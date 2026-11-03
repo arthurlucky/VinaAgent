@@ -14,10 +14,13 @@ import 'package:pocketstrike/features/agent/data/agent_engine.dart';
 import 'package:pocketstrike/features/agent/data/hermes_memory_store.dart';
 import 'package:pocketstrike/features/agent/domain/agent_event.dart';
 import 'package:pocketstrike/features/agent/domain/agent_tool.dart';
+import 'package:pocketstrike/features/chat/application/run_registry.dart';
+import 'package:pocketstrike/features/chat/domain/chat_run.dart';
 import 'package:pocketstrike/features/conversations/application/conversations_controller.dart';
 import 'package:pocketstrike/features/local_models/data/local_model_engine.dart';
 import 'package:pocketstrike/features/local_models/data/local_model_info.dart';
 import 'package:pocketstrike/features/local_models/data/local_model_store.dart';
+import 'package:pocketstrike/features/plugins/application/plugins_controller.dart';
 import 'package:pocketstrike/features/providers/application/providers_controller.dart';
 import 'package:pocketstrike/features/providers/data/mock_provider.dart';
 import 'package:pocketstrike/features/providers/domain/ai_provider.dart';
@@ -53,6 +56,7 @@ class ChatState {
     this.error,
     this.runId,
     this.steps = const [],
+    this.activeConversationId,
   });
 
   final bool isGenerating;
@@ -81,6 +85,9 @@ class ChatState {
   final String? runId;
   final List<AgentStep> steps;
 
+  /// Conversation that produced this state. `null` for legacy/direct callers.
+  final String? activeConversationId;
+
   ChatMode get currentMode {
     if (localMode) return ChatMode.local;
     if (agentMode) return ChatMode.agent;
@@ -106,6 +113,7 @@ class ChatState {
     bool clearError = false,
     String? runId,
     List<AgentStep>? steps,
+    String? activeConversationId,
   }) {
     return ChatState(
       isGenerating: isGenerating ?? this.isGenerating,
@@ -126,6 +134,8 @@ class ChatState {
       error: clearError ? null : (error ?? this.error),
       runId: runId ?? this.runId,
       steps: steps ?? this.steps,
+      activeConversationId:
+          activeConversationId ?? this.activeConversationId,
     );
   }
 }
@@ -138,8 +148,13 @@ class ChatController extends StateNotifier<ChatState> {
   /// Hook supplied by UI to present confirmation dialogs for destructive tools.
   ConfirmHandler? confirmHandler;
 
-  CancelToken? _cancelToken;
+  final Map<String, CancelToken> _cancelTokens = {};
   final Set<String> _sessionApprovedTools = {};
+
+  ChatRunRegistry get _registry => ref.read(chatRunRegistryProvider);
+
+  ChatRunState _runState(String conversationId) =>
+      _registry.stateFor(conversationId);
 
   void toggleAgentMode(bool enabled) {
     state = state.copyWith(agentMode: enabled, localMode: false);
@@ -165,29 +180,170 @@ class ChatController extends StateNotifier<ChatState> {
   }
 
   void clearError() {
-    state = state.copyWith(clearError: true);
+    final conversationId = ref.read(currentConversationIdProvider);
+    if (conversationId != null) {
+      _updateRun(
+        conversationId,
+        _runState(conversationId).copyWith(clearError: true),
+      );
+    } else {
+      state = state.copyWith(clearError: true);
+    }
   }
 
+  /// Pushes a per-conversation run state into the registry and mirrors it to the
+  /// legacy global [ChatState] when the conversation is the one on screen.
+  void _updateRun(String conversationId, ChatRunState next) {
+    _registry.update(conversationId, next);
+    _mirrorToChatState(conversationId, _registry.stateFor(conversationId));
+  }
+
+  void _mirrorToChatState(String conversationId, ChatRunState run) {
+    if (ref.read(currentConversationIdProvider) != conversationId) return;
+    state = state.copyWith(
+      isGenerating: run.isGenerating,
+      isGeneratingImage: run.isGeneratingImage,
+      imageGenerationPrompt: run.imageGenerationPrompt,
+      clearImagePrompt: run.imageGenerationPrompt == null,
+      streamingText: run.streamingText,
+      tokensPerSecond: run.tokensPerSecond,
+      clearTokensPerSecond: run.tokensPerSecond == null,
+      tokenCount: run.tokenCount,
+      status: run.status,
+      clearStatus: run.status == null,
+      error: run.error,
+      clearError: run.error == null,
+      runId: run.runId,
+      steps: run.steps,
+      activeConversationId: conversationId,
+    );
+  }
+
+  void _recordMessageSpeed(String msgId, double? tps) {
+    if (tps == null || tps <= 0) return;
+    state = state.copyWith(
+      messageSpeeds: {...state.messageSpeeds, msgId: tps},
+    );
+  }
+
+  /// Sends a message to [conversationId] (defaults to the open conversation).
+  ///
+  /// If a run is already active in that conversation the message is appended to
+  /// the delayed queue instead of being dropped or blocking the composer.
   Future<void> sendMessage({
     required String text,
     List<AttachmentMeta> attachments = const [],
     String? activeSkillName,
+    String? conversationId,
   }) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty && attachments.isEmpty) return;
-    if (state.isGenerating) return;
 
     // 1. Ensure active conversation exists.
-    final conversationId = await ref
-        .read(conversationActionsProvider)
-        .ensureActiveConversation();
+    final targetId = conversationId ??
+        await ref.read(conversationActionsProvider).ensureActiveConversation();
 
-    // 2. Resolve AI provider & model.
+    // 2. Running? Queue the message for later ("delay message task").
+    if (_registry.isRunning(targetId)) {
+      _registry.enqueue(
+        targetId,
+        QueuedChatMessage(
+          id: _uuid.v4(),
+          text: trimmed,
+          attachments: attachments,
+          activeSkillName: activeSkillName,
+          queuedAt: DateTime.now(),
+        ),
+      );
+      return;
+    }
+
+    // 3. Mark the conversation busy immediately so a second quick send queues.
+    final cancelToken = CancelToken();
+    _cancelTokens[targetId] = cancelToken;
+    _updateRun(
+      targetId,
+      _runState(targetId).copyWith(
+        isGenerating: true,
+        streamingText: '',
+        steps: const [],
+        status: 'Thinking…',
+        clearError: true,
+        clearStatus: false,
+        clearTokensPerSecond: true,
+        clearRunId: true,
+        clearImagePrompt: true,
+      ),
+    );
+
+    try {
+      await _executeMessage(
+        conversationId: targetId,
+        text: trimmed,
+        attachments: attachments,
+        activeSkillName: activeSkillName,
+        cancelToken: cancelToken,
+      );
+    } catch (error) {
+      _updateRun(
+        targetId,
+        _runState(targetId).copyWith(error: error.toString()),
+      );
+    } finally {
+      _cancelTokens.remove(targetId);
+      await ref.read(pluginControllerProvider.notifier).runLifecycleHook(
+        'after_run',
+        environment: {'VINA_CONVERSATION_ID': targetId},
+      );
+      _updateRun(
+        targetId,
+        _runState(targetId).copyWith(
+          isGenerating: false,
+          isGeneratingImage: false,
+          clearImagePrompt: true,
+          streamingText: '',
+          clearStatus: true,
+          clearTokensPerSecond: true,
+        ),
+      );
+
+      // 4. Dispatch the next queued message, if any.
+      final next = _registry.dequeue(targetId);
+      if (next != null) {
+        unawaited(
+          sendMessage(
+            text: next.text,
+            attachments: next.attachments,
+            activeSkillName: next.activeSkillName,
+            conversationId: targetId,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _executeMessage({
+    required String conversationId,
+    required String text,
+    required List<AttachmentMeta> attachments,
+    required String? activeSkillName,
+    required CancelToken cancelToken,
+  }) async {
+    await ref.read(pluginControllerProvider.notifier).ensureReady();
+    await ref.read(pluginControllerProvider.notifier).runLifecycleHook(
+      'before_send',
+      environment: {
+        'VINA_CONVERSATION_ID': conversationId,
+        'VINA_PROMPT': text,
+      },
+    );
+
+    // Resolve AI provider & model.
     AIProvider provider;
     String model;
     GenerationParams params;
 
-    final lowerTrimmed = trimmed.toLowerCase();
+    final lowerTrimmed = text.toLowerCase();
     final isSlashImageCommand = lowerTrimmed.startsWith('/image') ||
         lowerTrimmed.startsWith('/img');
     final isNaturalImageCommand = lowerTrimmed.startsWith('generate image') ||
@@ -220,8 +376,12 @@ class ChatController extends StateNotifier<ChatState> {
     } else {
       final activeConfig = await ref.read(activeProviderConfigProvider.future);
       if (activeConfig == null) {
-        state = state.copyWith(
-          error: 'No active AI provider configured. Add one in Settings or switch to Local mode.',
+        _updateRun(
+          conversationId,
+          _runState(conversationId).copyWith(
+            error:
+                'No active AI provider configured. Add one in Settings or switch to Local mode.',
+          ),
         );
         return;
       }
@@ -229,7 +389,11 @@ class ChatController extends StateNotifier<ChatState> {
           .read(providerResolverProvider)
           .resolve(configId: activeConfig.id);
       if (resolved == null) {
-        state = state.copyWith(error: 'Failed to initialize AI provider.');
+        _updateRun(
+          conversationId,
+          _runState(conversationId)
+              .copyWith(error: 'Failed to initialize AI provider.'),
+        );
         return;
       }
       provider = resolved;
@@ -242,18 +406,18 @@ class ChatController extends StateNotifier<ChatState> {
           .paramsFor(provider.configId);
     }
 
-    // 3. Persist the user message.
+    // Persist the user message.
     final userMessage = ChatMessage(
       id: _uuid.v4(),
       role: MessageRole.user,
-      content: trimmed,
+      content: text,
       attachments: attachments,
       createdAt: DateTime.now(),
     );
     await _persistMessage(conversationId, userMessage);
-    await _maybeAutoTitle(conversationId, trimmed);
+    await _maybeAutoTitle(conversationId, text);
 
-    // 4. Build provider history (system prompt from persona + prior msgs).
+    // Build provider history (system prompt from persona + prior msgs).
     final history = await _buildHistory(
       conversationId,
       params,
@@ -261,61 +425,64 @@ class ChatController extends StateNotifier<ChatState> {
     );
 
     final localStore = ref.read(localModelStoreProvider);
-    final isImageRequest = (state.localMode && localStore.activeModel?.type == LocalModelType.imageModel) || isExplicitImage;
+    final isImageRequest =
+        (state.localMode && localStore.activeModel?.type == LocalModelType.imageModel) ||
+            isExplicitImage;
 
-    state = state.copyWith(
-      isGenerating: true,
-      isGeneratingImage: isImageRequest,
-      imageGenerationPrompt: isImageRequest ? trimmed : null,
-      streamingText: '',
-      status: isImageRequest ? 'Generating image…' : 'Thinking…',
-      steps: const [],
-      clearError: true,
+    _updateRun(
+      conversationId,
+      _runState(conversationId).copyWith(
+        isGeneratingImage: isImageRequest,
+        imageGenerationPrompt: isImageRequest ? text : null,
+        clearImagePrompt: !isImageRequest,
+        status: isImageRequest ? 'Generating image…' : 'Thinking…',
+      ),
     );
-    _cancelToken = CancelToken();
 
-    try {
-      if (state.agentMode) {
-        await _runAgent(
-          conversationId: conversationId,
-          provider: provider,
-          model: model,
-          params: params,
-          history: history,
-        );
-      } else {
-        await _runPlainChat(
-          conversationId: conversationId,
-          provider: provider,
-          model: model,
-          params: params,
-          history: history,
-        );
-      }
-    } finally {
-      state = state.copyWith(
-        isGenerating: false,
-        isGeneratingImage: false,
-        clearImagePrompt: true,
-        streamingText: '',
-        clearStatus: true,
+    if (state.agentMode) {
+      await _runAgent(
+        conversationId: conversationId,
+        provider: provider,
+        model: model,
+        params: params,
+        history: history,
+        cancelToken: cancelToken,
       );
-      _cancelToken = null;
+    } else {
+      await _runPlainChat(
+        conversationId: conversationId,
+        provider: provider,
+        model: model,
+        params: params,
+        history: history,
+        cancelToken: cancelToken,
+      );
     }
   }
 
-  /// Cancels in-flight generation or agent execution.
-  void stopGeneration() {
-    if (_cancelToken != null && !_cancelToken!.isCancelled) {
-      _cancelToken!.cancel('User stopped generation');
-      state = state.copyWith(
+  /// Cancels in-flight generation for [conversationId] (defaults to the open
+  /// conversation) and clears its pending delayed messages.
+  void stopGeneration({String? conversationId}) {
+    final id = conversationId ?? ref.read(currentConversationIdProvider);
+    if (id == null) return;
+
+    final token = _cancelTokens[id];
+    if (token != null && !token.isCancelled) {
+      token.cancel('User stopped generation');
+    }
+
+    _updateRun(
+      id,
+      _runState(id).copyWith(
         isGenerating: false,
         isGeneratingImage: false,
         clearImagePrompt: true,
         clearStatus: true,
-      );
-      _cancelToken = null;
-    }
+        clearTokensPerSecond: true,
+        streamingText: '',
+        queued: const [],
+      ),
+    );
   }
 
   /// Injects a scheduled reminder message into the active chat.
@@ -338,7 +505,8 @@ class ChatController extends StateNotifier<ChatState> {
   /// Re-runs the last user message (regenerate).
   Future<void> regenerate() async {
     final conversationId = ref.read(currentConversationIdProvider);
-    if (conversationId == null || state.isGenerating) return;
+    if (conversationId == null) return;
+    if (_registry.isRunning(conversationId)) return;
     final messages = await ref
         .read(appDatabaseProvider)
         .messagesDao
@@ -350,17 +518,20 @@ class ChatController extends StateNotifier<ChatState> {
         .read(appDatabaseProvider)
         .messagesDao
         .deleteFrom(conversationId, lastUser.createdAt);
-    await sendMessage(text: lastUser.content);
+    await sendMessage(text: lastUser.content, conversationId: conversationId);
   }
 
   /// Edits a past user message and re-runs from that point.
   Future<void> editAndResend(Message message, String newText) async {
-    if (state.isGenerating) return;
+    if (_registry.isRunning(message.conversationId)) return;
     await ref.read(appDatabaseProvider).messagesDao.deleteFrom(
           message.conversationId,
           message.createdAt,
         );
-    await sendMessage(text: newText);
+    await sendMessage(
+      text: newText,
+      conversationId: message.conversationId,
+    );
   }
 
   // ------------------------------------------------------------------
@@ -373,6 +544,7 @@ class ChatController extends StateNotifier<ChatState> {
     required String model,
     required GenerationParams params,
     required List<ChatMessage> history,
+    required CancelToken cancelToken,
   }) async {
     final buffer = StringBuffer();
     UsageInfo? usageInfo;
@@ -385,7 +557,7 @@ class ChatController extends StateNotifier<ChatState> {
       messages: history,
       model: model,
       params: params,
-      cancelToken: _cancelToken,
+      cancelToken: cancelToken,
     ))) {
       switch (event) {
         case TextDeltaEvent(:final text):
@@ -395,17 +567,23 @@ class ChatController extends StateNotifier<ChatState> {
           if (elapsed > 0.12) {
             lastTps = tokenCount / elapsed;
           }
-          state = state.copyWith(
-            streamingText: buffer.toString(),
-            tokensPerSecond: lastTps,
-            tokenCount: tokenCount,
+          _updateRun(
+            conversationId,
+            _runState(conversationId).copyWith(
+              streamingText: buffer.toString(),
+              tokensPerSecond: lastTps,
+              tokenCount: tokenCount,
+            ),
           );
           break;
         case SpeedMetricsEvent(:final tokensPerSecond, :final tokenCount):
           lastTps = tokensPerSecond;
-          state = state.copyWith(
-            tokensPerSecond: tokensPerSecond,
-            tokenCount: tokenCount ?? state.tokenCount,
+          _updateRun(
+            conversationId,
+            _runState(conversationId).copyWith(
+              tokensPerSecond: tokensPerSecond,
+              tokenCount: tokenCount ?? _runState(conversationId).tokenCount,
+            ),
           );
           break;
         case UsageEvent(:final usage):
@@ -419,27 +597,26 @@ class ChatController extends StateNotifier<ChatState> {
         case StreamDoneEvent():
           break;
       }
-      if (_cancelToken?.isCancelled ?? false) break;
+      if (cancelToken.isCancelled) break;
     }
 
     stopwatch.stop();
     final totalElapsedSec = stopwatch.elapsedMilliseconds / 1000.0;
     final finalTps = (totalElapsedSec > 0.15 && tokenCount > 0)
         ? (tokenCount / totalElapsedSec)
-        : (lastTps ?? state.tokensPerSecond);
+        : (lastTps ?? _runState(conversationId).tokensPerSecond);
 
     if (error != null) {
-      state = state.copyWith(error: error);
+      _updateRun(
+        conversationId,
+        _runState(conversationId).copyWith(error: error),
+      );
       return;
     }
 
     if (buffer.isNotEmpty) {
       final msgId = _uuid.v4();
-      if (finalTps != null && finalTps > 0) {
-        state = state.copyWith(
-          messageSpeeds: {...state.messageSpeeds, msgId: finalTps},
-        );
-      }
+      _recordMessageSpeed(msgId, finalTps);
       await _persistMessage(
         conversationId,
         ChatMessage(
@@ -467,6 +644,7 @@ class ChatController extends StateNotifier<ChatState> {
     required String model,
     required GenerationParams params,
     required List<ChatMessage> history,
+    required CancelToken cancelToken,
   }) async {
     final tools = await _availableTools(conversationId);
     final forceConfirm = await _forcedMcpConfirmations(conversationId);
@@ -479,7 +657,7 @@ class ChatController extends StateNotifier<ChatState> {
             createdAt: DateTime.now(),
           ),
         );
-    state = state.copyWith(runId: runId);
+    _updateRun(conversationId, _runState(conversationId).copyWith(runId: runId));
 
     final engine = AgentEngine();
     final steps = <AgentStep>[];
@@ -499,7 +677,7 @@ class ChatController extends StateNotifier<ChatState> {
       policy: _policy,
       sessionApproved: _sessionApprovedTools,
       forceConfirm: forceConfirm,
-      cancelToken: _cancelToken,
+      cancelToken: cancelToken,
       requestConfirmation: (tool, call) async {
         final handler = confirmHandler;
         if (handler == null) return ConfirmResult.deny;
@@ -512,7 +690,10 @@ class ChatController extends StateNotifier<ChatState> {
     )) {
       switch (event) {
         case AgentStatusEvent(:final status):
-          state = state.copyWith(status: status);
+          _updateRun(
+            conversationId,
+            _runState(conversationId).copyWith(status: status),
+          );
           break;
         case AgentTextDeltaEvent(:final text):
           buffer.write(text);
@@ -521,10 +702,13 @@ class ChatController extends StateNotifier<ChatState> {
           if (elapsed > 0.12) {
             lastTps = tokenCount / elapsed;
           }
-          state = state.copyWith(
-            streamingText: buffer.toString(),
-            tokensPerSecond: lastTps,
-            tokenCount: tokenCount,
+          _updateRun(
+            conversationId,
+            _runState(conversationId).copyWith(
+              streamingText: buffer.toString(),
+              tokensPerSecond: lastTps,
+              tokenCount: tokenCount,
+            ),
           );
           break;
         case AgentToolCallStartedEvent(:final call):
@@ -534,9 +718,12 @@ class ChatController extends StateNotifier<ChatState> {
             toolName: call.name,
             argumentsJson: call.argumentsJson,
           ));
-          state = state.copyWith(
-            steps: List.unmodifiable(steps),
-            status: 'Running ${call.name}…',
+          _updateRun(
+            conversationId,
+            _runState(conversationId).copyWith(
+              steps: List.unmodifiable(steps),
+              status: 'Running ${call.name}…',
+            ),
           );
           break;
         case AgentToolCallCompletedEvent(:final call, :final result, :final isError):
@@ -547,9 +734,12 @@ class ChatController extends StateNotifier<ChatState> {
             result: result,
             isError: isError,
           ));
-          state = state.copyWith(
-            steps: List.unmodifiable(steps),
-            status: 'Reasoning…',
+          _updateRun(
+            conversationId,
+            _runState(conversationId).copyWith(
+              steps: List.unmodifiable(steps),
+              status: 'Reasoning…',
+            ),
           );
           await _persistMessage(
             conversationId,
@@ -569,9 +759,12 @@ class ChatController extends StateNotifier<ChatState> {
             timestamp: DateTime.now(),
             toolName: call.name,
           ));
-          state = state.copyWith(
-            steps: List.unmodifiable(steps),
-            status: 'Denied ${call.name}',
+          _updateRun(
+            conversationId,
+            _runState(conversationId).copyWith(
+              steps: List.unmodifiable(steps),
+              status: 'Denied ${call.name}',
+            ),
           );
           break;
         case AgentAssistantMessageEvent(:final message):
@@ -581,7 +774,10 @@ class ChatController extends StateNotifier<ChatState> {
           break;
         case AgentRunErrorEvent(:final message):
           runStatus = 'error';
-          state = state.copyWith(error: message);
+          _updateRun(
+            conversationId,
+            _runState(conversationId).copyWith(error: message),
+          );
           break;
         case AgentRunFinishedEvent(:final cancelled):
           if (cancelled) runStatus = 'cancelled';
@@ -593,7 +789,7 @@ class ChatController extends StateNotifier<ChatState> {
     final totalElapsedSec = stopwatch.elapsedMilliseconds / 1000.0;
     final finalTps = (totalElapsedSec > 0.15 && tokenCount > 0)
         ? (tokenCount / totalElapsedSec)
-        : (lastTps ?? state.tokensPerSecond);
+        : (lastTps ?? _runState(conversationId).tokensPerSecond);
 
     final finalText = buffer.toString().trim();
     String contentToPersist = finalText.isNotEmpty
@@ -658,11 +854,7 @@ class ChatController extends StateNotifier<ChatState> {
     }
 
     final msgId = finalAssistant?.id ?? _uuid.v4();
-    if (finalTps != null && finalTps > 0) {
-      state = state.copyWith(
-        messageSpeeds: {...state.messageSpeeds, msgId: finalTps},
-      );
-    }
+    _recordMessageSpeed(msgId, finalTps);
 
     final toolCallsForMessage = <ToolCallInfo>[];
     final generatedAttachments = <AttachmentMeta>[];
@@ -776,7 +968,10 @@ class ChatController extends StateNotifier<ChatState> {
       completionTokens: tokenCount > 0 ? tokenCount : null,
     );
 
-    state = state.copyWith(steps: List.unmodifiable(steps));
+    _updateRun(
+      conversationId,
+      _runState(conversationId).copyWith(steps: List.unmodifiable(steps)),
+    );
     await ref.read(appDatabaseProvider).agentRunsDao.updateRun(
           runId,
           runStatus,
@@ -954,9 +1149,12 @@ class ChatController extends StateNotifier<ChatState> {
     if (state.agentMode) {
       const agentImageInstruction =
           'You have full capabilities to generate images using the "generate_image" tool. When the user asks you to generate, create, draw, paint, design, or render an image, artwork, illustration, photo, or wallpaper, ALWAYS call the "generate_image" tool with a detailed, creative visual prompt and "1:1" aspect ratio unless specified otherwise.';
+      const sandboxInstruction =
+          'File tools are sandboxed to the app documents folder (the Vina Agent file manager). Use relative paths such as "Documents/notes.txt", "Downloads/report.pdf" or an absolute path returned by list_files. External storage paths such as /storage/emulated/0 and /sdcard are not accessible.';
       systemPrompt = systemPrompt.isEmpty
           ? agentImageInstruction
           : '$systemPrompt\n\n$agentImageInstruction';
+      systemPrompt = '$systemPrompt\n\n$sandboxInstruction';
 
       if (installedSkills.isNotEmpty) {
         final skillCatalog = await skillStore.buildCatalogPrompt();
@@ -1076,6 +1274,39 @@ class ChatController extends StateNotifier<ChatState> {
 final chatControllerProvider =
     StateNotifierProvider<ChatController, ChatState>((ref) {
   return ChatController(ref);
+});
+
+/// Live run state for the conversation currently on screen.
+///
+/// Falls back to the legacy global [ChatState] when it was set directly (for
+/// example by tests) so existing widgets keep working.
+final currentChatRunProvider = Provider<ChatRunState>((ref) {
+  final conversationId = ref.watch(currentConversationIdProvider);
+  final registry = ref.watch(chatRunRegistryProvider);
+  final run = registry.stateFor(conversationId);
+
+  if (run.hasActivity || run.queued.isNotEmpty) return run;
+
+  final legacy = ref.watch(chatControllerProvider);
+  final belongsToCurrent = legacy.activeConversationId == null ||
+      legacy.activeConversationId == conversationId;
+  if (belongsToCurrent &&
+      (legacy.isGenerating || legacy.streamingText.isNotEmpty)) {
+    return ChatRunState(
+      conversationId: conversationId,
+      isGenerating: legacy.isGenerating,
+      isGeneratingImage: legacy.isGeneratingImage,
+      imageGenerationPrompt: legacy.imageGenerationPrompt,
+      streamingText: legacy.streamingText,
+      tokensPerSecond: legacy.tokensPerSecond,
+      tokenCount: legacy.tokenCount,
+      status: legacy.status,
+      error: legacy.error,
+      runId: legacy.runId,
+      steps: legacy.steps,
+    );
+  }
+  return run;
 });
 
 String _guessMimeType(String filePath) {

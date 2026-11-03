@@ -7,6 +7,7 @@ import 'package:pocketstrike/features/artifacts/ui/artifacts_screen.dart';
 import 'package:pocketstrike/features/chat/ui/home_shell.dart';
 import 'package:pocketstrike/features/onboarding/onboarding_screen.dart';
 import 'package:pocketstrike/features/onboarding/splash_screen.dart';
+import 'package:pocketstrike/features/plugins/ui/plugins_screen.dart';
 import 'package:pocketstrike/features/settings/ui/about_export_screen.dart';
 import 'package:pocketstrike/features/settings/ui/agent_tools_screen.dart';
 import 'package:pocketstrike/features/settings/ui/appearance_settings_screen.dart';
@@ -46,6 +47,7 @@ abstract class AppRoutes {
   static const settingsHermes = '/settings/hermes';
   static const settingsTasks = '/settings/tasks';
   static const settingsSkills = '/settings/skills';
+  static const settingsPlugins = '/settings/plugins';
   static const settingsAgents = '/settings/agents';
   static const settingsArtifacts = '/settings/artifacts';
   static const settingsFiles = '/settings/files';
@@ -151,6 +153,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.settingsSkills,
         builder: (context, state) => const SkillsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.settingsPlugins,
+        builder: (context, state) => const PluginsScreen(),
       ),
       GoRoute(
         path: AppRoutes.settingsAgents,

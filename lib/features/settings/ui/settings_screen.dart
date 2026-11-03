@@ -83,6 +83,13 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => context.push(AppRoutes.settingsSkills),
           ),
           _SettingsTile(
+            icon: Icons.extension_outlined,
+            title: 'Plugins',
+            subtitle:
+                'Bundle skills, sub-agents, hooks, MCP servers & slash commands',
+            onTap: () => context.push(AppRoutes.settingsPlugins),
+          ),
+          _SettingsTile(
             icon: Icons.groups_2_outlined,
             title: 'Sub-agents',
             subtitle: 'Specialists with their own persona, model and tool allowlist',

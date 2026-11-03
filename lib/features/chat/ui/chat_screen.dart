@@ -108,6 +108,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget build(BuildContext context) {
     final tokens = context.glass;
     final chatState = ref.watch(chatControllerProvider);
+    final run = ref.watch(currentChatRunProvider);
     final messages = ref.watch(messagesProvider).valueOrNull ?? const [];
     final conversation = ref.watch(currentConversationProvider).valueOrNull;
     final configs = ref.watch(providerConfigsProvider).valueOrNull ?? const [];
@@ -117,12 +118,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final inputEnabled = hasProvider || chatState.demoMode || chatState.localMode;
 
     // Follow streaming text live
-    if (chatState.isGenerating && _autoScrollEnabled) {
+    if (run.isGenerating && _autoScrollEnabled) {
       _scrollToBottom(animated: false);
     }
 
     // Surface errors & follow stream lifecycle events
-    ref.listen(chatControllerProvider, (prev, next) {
+    ref.listen(currentChatRunProvider, (prev, next) {
       if (next.error != null && next.error != prev?.error) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(next.error!)),
@@ -174,12 +175,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
-          if (chatState.status != null)
+          if (run.status != null)
             Padding(
               padding: const EdgeInsets.only(right: 6),
               child: Center(
                 child: Text(
-                  chatState.status!,
+                  run.status!,
                   style: Theme.of(context)
                       .textTheme.bodySmall
                       ?.copyWith(color: tokens.textSecondary, fontSize: 11),
@@ -214,7 +215,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         }
                       }
                     case 'run':
-                      final runId = ref.read(chatControllerProvider).runId;
+                      final runId = run.runId;
                       if (runId != null && context.mounted) {
                         context.push('${AppRoutes.agentRun}/$runId');
                       }
@@ -225,7 +226,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     value: 'branch',
                     child: Text('Branch conversation'),
                   ),
-                  if (chatState.runId != null)
+                  if (run.runId != null)
                     const PopupMenuItem(
                       value: 'run',
                       child: Text('View agent run'),
@@ -273,7 +274,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     actionLabel: 'Add a provider',
                     onAction: () => context.push(AppRoutes.settingsProviders),
                   )
-                : (messages.isEmpty && chatState.streamingText.isEmpty)
+                : (messages.isEmpty && run.streamingText.isEmpty)
                     ? EmptyState(
                         icon: chatState.localMode
                             ? (activeLocal?.type == LocalModelType.imageModel
@@ -314,7 +315,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                   ),
                                   padding: const EdgeInsets.fromLTRB(0, 8, 0, 16),
                                   itemCount: visibleMessages.length +
-                                      (chatState.isGenerating
+                                      (run.isGenerating
                                           ? (chatState.agentMode ? 2 : 1)
                                           : 0),
                                   itemBuilder: (context, index) {
@@ -339,24 +340,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                       // extraIndex 1 -> Streaming reply container
                                       if (extraIndex == 0) {
                                         return AgentTimeline(
-                                          steps: chatState.steps,
-                                          running: chatState.isGenerating,
+                                          steps: run.steps,
+                                          running: run.isGenerating,
                                         );
                                       } else {
                                         return _StreamingBubble(
-                                          text: chatState.streamingText,
+                                          text: run.streamingText,
                                         );
                                       }
                                     } else {
                                       // Non-Agent Mode:
-                                      if (chatState.isGeneratingImage) {
+                                      if (run.isGeneratingImage) {
                                         return _ImageGenerationLoadingCard(
                                           prompt:
-                                              chatState.imageGenerationPrompt ?? '',
+                                              run.imageGenerationPrompt ?? '',
                                         );
                                       }
                                       return _StreamingBubble(
-                                        text: chatState.streamingText,
+                                        text: run.streamingText,
                                       );
                                     }
                                   },
@@ -369,7 +370,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               bottom: 12,
                               right: 16,
                               child: _ScrollToBottomFloatingButton(
-                                isGenerating: chatState.isGenerating,
+                                isGenerating: run.isGenerating,
                                 onTap: () {
                                   HapticFeedback.selectionClick();
                                   setState(() {

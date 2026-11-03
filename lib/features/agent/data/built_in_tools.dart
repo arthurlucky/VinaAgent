@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import '../../plugins/data/plugin_store.dart';
+import '../../plugins/data/plugin_tools.dart';
 import '../../process/data/process_agent_tools.dart';
 import '../../process/data/process_manager_service.dart';
 import '../../web/data/web_search_service.dart';
@@ -19,6 +21,8 @@ class BuiltInTools {
     String activeWorkdir = '',
     required WebSearchService webSearch,
     ProcessManagerService? processManager,
+    PluginStore? pluginStore,
+    Future<void> Function()? onPluginsChanged,
   }) => [
         currentTime(),
         calculator(),
@@ -35,6 +39,11 @@ class BuiltInTools {
             processManager: processManager,
             allowedRoots: allowedRoots,
             activeWorkdir: activeWorkdir,
+          ),
+        if (pluginStore != null)
+          ...PluginTools.all(
+            store: pluginStore,
+            onChanged: onPluginsChanged,
           ),
       ];
 

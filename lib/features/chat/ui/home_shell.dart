@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../conversations/application/conversations_controller.dart';
+import '../../plugins/application/plugins_controller.dart';
 import 'chat_screen.dart';
 import 'widgets/app_drawer.dart';
 
@@ -43,6 +44,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   @override
   Widget build(BuildContext context) {
     ref.watch(conversationPersistenceProvider);
+    // Initialise the plugin library once the app shell is mounted so plugin
+    // skills/agents are available before the first message is sent.
+    ref.watch(pluginControllerProvider);
     return const Scaffold(
       drawer: AppDrawer(),
       body: ChatScreen(),

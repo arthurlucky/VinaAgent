@@ -42,12 +42,41 @@ class StorageAgentTools {
   ]) {
     if (allowedRoots.isEmpty) return rawPath.trim();
     final root = allowedRoots.first;
+    final rootNorm = p.canonicalize(root);
     final trimmed = rawPath.trim().replaceAll('\\', '/');
+    if (trimmed.isEmpty) return rootNorm;
 
-    if (trimmed.startsWith('/') || trimmed.startsWith(root)) {
-      final stripped = trimmed.replaceFirst(RegExp(r'^/+'), '');
-      return AppSandbox.resolveWithRoot(stripped, root) ??
-          p.join(root, stripped);
+    // Absolute paths must resolve inside the sandbox. Previously the leading
+    // slash was stripped first, which turned an absolute path returned by
+    // list_files into "<root>/data/user/.../VinaAgent/..." and made the file
+    // invisible in the file manager. Let AppSandbox decide instead.
+    if (trimmed == '/root' || trimmed.startsWith('/root/')) {
+      final relative =
+          trimmed.substring('/root'.length).replaceFirst(RegExp(r'^/+'), '');
+      return AppSandbox.resolveWithRoot(relative, rootNorm) ?? rootNorm;
+    }
+    if (trimmed.startsWith('/') || trimmed.startsWith(rootNorm)) {
+      if (!trimmed.startsWith(rootNorm)) {
+        final friendly = RegExp(
+          r'^/+(Documents|Downloads|Artifacts|Exports|Skills|Plugins)(/|$)',
+          caseSensitive: false,
+        );
+        if (!friendly.hasMatch(trimmed)) {
+          throw StateError(
+            'Access denied: "$rawPath" is outside the app sandbox. '
+            'Use a relative path such as "Documents/file.txt" or an absolute '
+            'path returned by list_files.',
+          );
+        }
+      }
+      return AppSandbox.resolveWithRoot(trimmed, rootNorm) ?? rootNorm;
+    }
+
+    // Accept friendly sandbox prefixes ("root/Documents/notes.txt").
+    var relative = trimmed.replaceFirst(RegExp(r'^(?:\./)+'), '');
+    if (relative == 'root') relative = '';
+    if (relative.startsWith('root/')) {
+      relative = relative.substring('root/'.length);
     }
 
     final wd = activeWorkdir
@@ -55,12 +84,11 @@ class StorageAgentTools {
         .replaceAll('\\', '/')
         .replaceAll(RegExp(r'^/+'), '');
     if (wd.isNotEmpty && wd != 'default' && wd != 'root') {
-      final combined = p.join(wd, trimmed);
-      return AppSandbox.resolveWithRoot(combined, root) ??
-          p.join(root, combined);
+      final combined = p.join(wd, relative);
+      return AppSandbox.resolveWithRoot(combined, rootNorm) ?? rootNorm;
     }
 
-    return AppSandbox.resolveWithRoot(trimmed, root) ?? p.join(root, trimmed);
+    return AppSandbox.resolveWithRoot(relative, rootNorm) ?? rootNorm;
   }
 
   static bool _isAllowed(String targetPath, List<String> allowedRoots) {

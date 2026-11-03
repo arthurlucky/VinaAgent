@@ -11,9 +11,11 @@ import 'package:pocketstrike/app/theme/glass_tokens.dart';
 import 'package:pocketstrike/core/models/chat_models.dart';
 import 'package:pocketstrike/features/agent/application/agent_workdir_controller.dart';
 import 'package:pocketstrike/features/chat/domain/slash_command.dart';
+import 'package:pocketstrike/features/chat/ui/widgets/btw_sheet.dart';
 import 'package:pocketstrike/features/conversations/application/conversations_controller.dart';
 import 'package:pocketstrike/features/local_models/data/local_model_info.dart';
 import 'package:pocketstrike/features/local_models/data/local_model_store.dart';
+import 'package:pocketstrike/features/plugins/application/plugins_controller.dart';
 import 'package:pocketstrike/features/process/ui/task_manager_sheet.dart';
 import 'package:pocketstrike/features/skills/application/skills_controller.dart';
 import 'package:pocketstrike/features/skills/ui/skill_marketplace_screen.dart';
@@ -158,9 +160,30 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
     final name = parts.first.substring(1).toLowerCase();
     final rest = trimmed.substring(parts.first.length).trim();
 
+    // Plugin-provided commands take precedence over unknown-command errors.
+    final pluginController = ref.read(pluginControllerProvider.notifier);
+    await pluginController.ensureReady();
+    if (!mounted) return false;
+    final pluginCommand = pluginController.findCommand(name);
+    if (pluginCommand != null) {
+      final prompt = pluginController.renderCommand(pluginCommand, rest);
+      HapticFeedback.lightImpact();
+      unawaited(
+        ref.read(chatControllerProvider.notifier).sendMessage(
+              text: prompt,
+              attachments: List.unmodifiable(_attachments),
+            ),
+      );
+      if (mounted) setState(_attachments.clear);
+      return true;
+    }
+
     switch (name) {
       case 'help':
         await _showCommands();
+        return true;
+      case 'btw':
+        await showBtwSheet(context, initialQuestion: rest);
         return true;
       case 'skills':
         await _showSkills();
@@ -396,7 +419,10 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              for (final command in kSlashCommands)
+              for (final command in [
+                ...kSlashCommands,
+                ...ref.read(pluginCommandsProvider),
+              ])
                 ListTile(
                   dense: true,
                   contentPadding: EdgeInsets.zero,
@@ -717,11 +743,15 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
   Widget build(BuildContext context) {
     final tokens = context.glass;
     final chatState = ref.watch(chatControllerProvider);
+    final run = ref.watch(currentChatRunProvider);
     final localStore = ref.watch(localModelStoreProvider);
     final activeLocal = localStore.activeModel;
     final isLocalImage = chatState.localMode && activeLocal?.type == LocalModelType.imageModel;
-    final generating = chatState.isGenerating;
-    final suggestions = slashCommandSuggestions(_textController.text);
+    final generating = run.isGenerating;
+    final suggestions = slashCommandSuggestions(
+      _textController.text,
+      extra: ref.watch(pluginCommandsProvider),
+    );
 
     final currentSteps = activeLocal?.steps ?? 20;
     final currentRatio = activeLocal?.aspectRatio ?? '1:1';
@@ -896,6 +926,42 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
                 ],
               ),
             ),
+          if (run.queued.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: tokens.accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: tokens.accent.withValues(alpha: 0.35),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.schedule_send,
+                          size: 13, color: tokens.accent),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${run.queued.length} message(s) queued — '
+                        'sending after the current run',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                          color: tokens.accent,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -921,7 +987,7 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
                 child: TextField(
                   controller: _textController,
                   focusNode: _focusNode,
-                  enabled: widget.enabled && !generating,
+                  enabled: widget.enabled,
                   minLines: 1,
                   maxLines: 6,
                   textInputAction: TextInputAction.newline,
@@ -930,13 +996,15 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
                   decoration: InputDecoration(
                     hintText: _isListening
                         ? 'Listening to your voice…'
-                        : (isLocalImage
-                            ? 'Describe image to generate on-device...'
-                            : (chatState.localMode
-                                ? 'Ask your local GGUF model offline...'
-                                : (widget.enabled
-                                    ? 'Message Vina Agent…'
-                                    : 'Add a provider to start chatting'))),
+                        : (generating
+                            ? 'Type a follow-up — it will be queued'
+                            : (isLocalImage
+                                ? 'Describe image to generate on-device...'
+                                : (chatState.localMode
+                                    ? 'Ask your local GGUF model offline...'
+                                    : (widget.enabled
+                                        ? 'Message Vina Agent…'
+                                        : 'Add a provider to start chatting')))),
                     hintStyle: TextStyle(
                       color: _isListening
                           ? Colors.redAccent.withValues(alpha: 0.8)
@@ -964,29 +1032,43 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
                 onPressed: widget.enabled ? _toggleListening : null,
               ),
               const SizedBox(width: 2),
-              // Send / Stop Button
+              // Stop current run (keeps the composer usable).
+              if (generating)
+                IconButton(
+                  tooltip: 'Stop current run',
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints.tightFor(width: 34, height: 34),
+                  icon: Icon(
+                    Icons.stop_circle_outlined,
+                    size: 21,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  onPressed: () {
+                    HapticFeedback.mediumImpact();
+                    ref.read(chatControllerProvider.notifier).stopGeneration();
+                  },
+                ),
+              // Send / queue button. Never disabled while a run is active.
               GestureDetector(
-                onTap: generating
-                    ? () => ref.read(chatControllerProvider.notifier).stop()
-                    : (widget.enabled ? _send : null),
+                onTap: widget.enabled ? _send : null,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 150),
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: generating
-                        ? Theme.of(context).colorScheme.error
-                        : (widget.enabled
-                            ? tokens.accent
-                            : tokens.accent.withValues(alpha: 0.3)),
+                    color: widget.enabled
+                        ? (generating
+                            ? tokens.accent.withValues(alpha: 0.75)
+                            : tokens.accent)
+                        : tokens.accent.withValues(alpha: 0.3),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    generating
-                        ? Icons.stop_rounded
-                        : AppIcons.send,
+                    generating ? Icons.schedule_send : AppIcons.send,
                     size: 18,
-                    color: generating ? Colors.white : tokens.onAccent,
+                    color: tokens.onAccent,
                   ),
                 ),
               ),

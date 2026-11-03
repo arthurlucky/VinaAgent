@@ -22,6 +22,7 @@ import '../../artifacts/data/artifact_tools.dart';
 import '../../conversations/application/conversations_controller.dart';
 import '../../mcp/application/mcp_controller.dart';
 import '../../mcp/data/mcp_connection_manager.dart';
+import '../../plugins/application/plugins_controller.dart';
 import '../../process/data/process_manager_service.dart';
 import '../../skills/application/marketplace_controller.dart';
 import '../../skills/application/skills_controller.dart';
@@ -115,6 +116,9 @@ class ProviderResolver {
         activeWorkdir: _ref.read(agentWorkdirProvider),
         webSearch: _ref.read(webSearchServiceProvider),
         processManager: _ref.read(processManagerProvider),
+        pluginStore: _ref.read(pluginStoreProvider),
+        onPluginsChanged: () =>
+            _ref.read(pluginControllerProvider.notifier).refresh(),
       ),
       ...SkillTools.all(
         store: skillStore,
