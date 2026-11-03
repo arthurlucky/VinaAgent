@@ -146,7 +146,7 @@ class PluginsScreen extends ConsumerWidget {
 }
 
 class _IntroCard extends StatelessWidget {
-  const _IntroCard({super.key, required this.tokens});
+  const _IntroCard({required this.tokens});
 
   final GlassTokens tokens;
 
@@ -187,7 +187,7 @@ class _IntroCard extends StatelessWidget {
 }
 
 class _PluginCard extends ConsumerWidget {
-  const _PluginCard({super.key, required this.plugin});
+  const _PluginCard({required this.plugin});
 
   final InstalledPlugin plugin;
 

@@ -43,14 +43,14 @@ class PluginStore {
   /// Creates the example plugin and a short README on first launch.
   Future<void> ensureSeeded() async {
     try {
-      final root = await root();
-      final readme = File(p.join(root.path, 'README.md'));
+      final pluginsDir = await root();
+      final readme = File(p.join(pluginsDir.path, 'README.md'));
       if (!await readme.exists()) {
         await readme.writeAsString(_pluginReadme, flush: true);
       }
       if (_prefs.getBool(_seededKey) == true) return;
 
-      final exampleDir = Directory(p.join(root.path, 'getting-started'));
+      final exampleDir = Directory(p.join(pluginsDir.path, 'getting-started'));
       if (!await exampleDir.exists()) {
         await createPlugin(
           name: 'getting-started',
@@ -70,9 +70,9 @@ class PluginStore {
   }
 
   Future<List<InstalledPlugin>> list() async {
-    final root = await root();
+    final pluginsDir = await root();
     final plugins = <InstalledPlugin>[];
-    await for (final entity in root.list(followLinks: false)) {
+    await for (final entity in pluginsDir.list(followLinks: false)) {
       if (entity is! Directory) continue;
       final plugin = await _readPlugin(entity);
       if (plugin != null) plugins.add(plugin);
@@ -96,11 +96,11 @@ class PluginStore {
       }
     }
 
-    PluginManifest? manifest;
+    PluginManifest? parsed;
     String? error;
     if (manifestFile != null) {
       try {
-        manifest = PluginManifest.tryParse(
+        parsed = PluginManifest.tryParse(
           await manifestFile.readAsString(),
           fallbackName: fallbackName,
         );
@@ -109,10 +109,11 @@ class PluginStore {
       }
     }
 
-    manifest ??= PluginManifest(
-      name: fallbackName,
-      description: 'Plugin folder without a plugin.json manifest.',
-    );
+    var manifest = parsed ??
+        PluginManifest(
+          name: fallbackName,
+          description: 'Plugin folder without a plugin.json manifest.',
+        );
 
     if (manifest.name.isEmpty) return null;
 
@@ -246,8 +247,8 @@ class PluginStore {
         'Invalid plugin name. Use lowercase letters, numbers, - and _.',
       );
     }
-    final root = await root();
-    final dir = Directory(p.join(root.path, slug));
+    final pluginsDir = await root();
+    final dir = Directory(p.join(pluginsDir.path, slug));
     if (await dir.exists()) {
       throw FormatException('A plugin named "$slug" already exists.');
     }
@@ -317,9 +318,9 @@ class PluginStore {
     if (!await source.exists()) {
       throw FormatException('Folder not found: $sourcePath');
     }
-    final root = await root();
+    final pluginsDir = await root();
     final name = p.basename(source.path);
-    final target = Directory(p.join(root.path, name));
+    final target = Directory(p.join(pluginsDir.path, name));
     if (await target.exists()) {
       throw FormatException('A plugin named "$name" already exists.');
     }
@@ -336,8 +337,8 @@ class PluginStore {
   Future<void> deletePlugin(String name) async {
     final safeName = p.basename(name.trim());
     if (safeName.isEmpty || safeName == '.' || safeName == '..') return;
-    final root = await root();
-    final dir = Directory(p.join(root.path, safeName));
+    final pluginsDir = await root();
+    final dir = Directory(p.join(pluginsDir.path, safeName));
     if (await dir.exists()) {
       await dir.delete(recursive: true);
     }
