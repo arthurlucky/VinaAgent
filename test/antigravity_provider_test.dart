@@ -113,14 +113,12 @@ void main() {
       final messages = [
         ChatMessage(
           id: '1',
-          conversationId: 'c1',
           role: MessageRole.user,
           content: 'Run ls',
           createdAt: DateTime.now(),
         ),
         ChatMessage(
           id: '2',
-          conversationId: 'c1',
           role: MessageRole.assistant,
           content: 'Running command...',
           toolCalls: const [
@@ -134,7 +132,6 @@ void main() {
         ),
         ChatMessage(
           id: '3',
-          conversationId: 'c1',
           role: MessageRole.tool,
           content: 'total 0',
           toolName: 'shell',
