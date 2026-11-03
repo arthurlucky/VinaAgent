@@ -84,7 +84,24 @@ class _ProviderEditScreenState extends ConsumerState<ProviderEditScreen> {
 
       List<String> models = [];
 
-      if (_selectedType == ProviderType.gemini) {
+      if (_selectedType == ProviderType.antigravity) {
+        final tempConfig = ProviderConfig(
+          id: widget.configId ?? 'temp',
+          type: _selectedType.id,
+          name: _nameController.text.trim(),
+          baseUrl: baseUrl,
+          defaultModel: _modelController.text.trim(),
+          isDefault: false,
+          hasKey: apiKey.isNotEmpty,
+          paramsJson: '{}',
+          createdAt: DateTime.now(),
+        );
+        final provider = ProviderRegistry.build(
+          tempConfig,
+          apiKey.isNotEmpty ? apiKey : null,
+        );
+        models = await provider.listModels();
+      } else if (_selectedType == ProviderType.gemini) {
         final url = '$baseUrl/v1beta/models?key=$apiKey';
         final resp = await dio.get(url);
         if (resp.data is Map<String, dynamic> && resp.data['models'] is List) {
@@ -380,10 +397,16 @@ class _ProviderEditScreenState extends ConsumerState<ProviderEditScreen> {
             controller: _keyController,
             obscureText: true,
             decoration: InputDecoration(
-              labelText: _selectedType.keyOptional
-                  ? 'API Key (optional for ${_selectedType.displayName})'
-                  : 'API Key (stored securely)',
-              hintText: isEditing ? '••••••••••••••••' : 'Enter API Key',
+              labelText: _selectedType == ProviderType.antigravity
+                  ? 'OAuth Token / JSON Credentials'
+                  : _selectedType.keyOptional
+                      ? 'API Key (optional for ${_selectedType.displayName})'
+                      : 'API Key (stored securely)',
+              hintText: isEditing
+                  ? '••••••••••••••••'
+                  : _selectedType == ProviderType.antigravity
+                      ? 'Bearer access token (ya29...) or JSON credentials'
+                      : 'Enter API Key',
               filled: true,
               fillColor: tokens.glassColor,
               border: OutlineInputBorder(

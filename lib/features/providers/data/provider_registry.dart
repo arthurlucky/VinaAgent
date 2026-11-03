@@ -1,6 +1,7 @@
 import '../../../core/db/app_database.dart';
 import '../domain/ai_provider.dart';
 import '../domain/provider_types.dart';
+import 'antigravity_provider.dart';
 import 'anthropic_provider.dart';
 import 'gemini_provider.dart';
 import 'mock_provider.dart';
@@ -17,6 +18,11 @@ class ProviderRegistry {
         : type.defaultBaseUrl;
 
     return switch (type) {
+      ProviderType.antigravity => AntigravityProvider(
+          configId: config.id,
+          baseUrl: baseUrl,
+          apiKey: apiKey,
+        ),
       ProviderType.anthropic => AnthropicProvider(
           configId: config.id,
           baseUrl: baseUrl,

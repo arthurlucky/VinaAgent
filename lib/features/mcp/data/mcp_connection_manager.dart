@@ -152,7 +152,7 @@ class McpConnectionManager {
     _setConnecting(server);
 
     final client = McpClient(
-      const Implementation(name: 'VinaAgent', version: '2.4.3'),
+      const Implementation(name: 'VinaAgent', version: '2.4.4'),
     );
 
     try {
@@ -256,7 +256,7 @@ class McpConnectionManager {
       createdAt: DateTime.now(),
     );
     final client = McpClient(
-      const Implementation(name: 'VinaAgent', version: '2.4.3'),
+      const Implementation(name: 'VinaAgent', version: '2.4.4'),
     );
     try {
       await client
