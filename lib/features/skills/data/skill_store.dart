@@ -435,7 +435,7 @@ class SkillStore {
   }
 
   // ------------------------------------------------------------------
-  // Pending drafts (auto-learned / AI-authored, require approval)
+  // Pending drafts (manual AI-authored drafts, require approval)
   // ------------------------------------------------------------------
 
   bool get autoLearnEnabled => _prefs.getBool(_autoLearnKey) ?? true;

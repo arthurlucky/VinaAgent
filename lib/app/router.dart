@@ -16,6 +16,7 @@ import 'package:pocketstrike/features/settings/ui/hermes_evolution_screen.dart';
 import 'package:pocketstrike/features/settings/ui/local_models_screen.dart';
 import 'package:pocketstrike/features/settings/ui/mcp_settings_screen.dart';
 import 'package:pocketstrike/features/settings/ui/memory_settings_screen.dart';
+import 'package:pocketstrike/features/memory/ui/memory_vault_screen.dart';
 import 'package:pocketstrike/features/settings/ui/model_params_screen.dart';
 import 'package:pocketstrike/features/settings/ui/provider_edit_screen.dart';
 import 'package:pocketstrike/features/settings/ui/providers_settings_screen.dart';
@@ -44,6 +45,7 @@ abstract class AppRoutes {
   static const settingsStorage = '/settings/storage';
   static const settingsTools = '/settings/tools';
   static const settingsMemory = '/settings/memory';
+  static const settingsMemoryVault = '/settings/memory-vault';
   static const settingsHermes = '/settings/hermes';
   static const settingsTasks = '/settings/tasks';
   static const settingsSkills = '/settings/skills';
@@ -141,6 +143,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.settingsMemory,
         builder: (context, state) => const MemorySettingsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.settingsMemoryVault,
+        builder: (context, state) => const MemoryVaultScreen(),
       ),
       GoRoute(
         path: AppRoutes.settingsHermes,

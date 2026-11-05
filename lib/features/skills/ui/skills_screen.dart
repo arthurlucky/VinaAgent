@@ -89,7 +89,7 @@ class SkillsScreen extends ConsumerWidget {
                 enabled: autoLearn,
                 title: 'Learn from experience',
                 subtitle:
-                    'After complex runs, draft a skill and queue it for review',
+                    'After complex runs, install a skill automatically without approval',
                 onChanged: (value) async {
                   await store.setAutoLearnEnabled(value);
                   _refresh(ref);

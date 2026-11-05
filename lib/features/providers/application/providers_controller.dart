@@ -22,6 +22,8 @@ import '../../artifacts/data/artifact_tools.dart';
 import '../../conversations/application/conversations_controller.dart';
 import '../../mcp/application/mcp_controller.dart';
 import '../../mcp/data/mcp_connection_manager.dart';
+import '../../memory/application/memory_controller.dart';
+import '../../memory/data/memory_tools.dart';
 import '../../plugins/application/plugins_controller.dart';
 import '../../process/data/process_manager_service.dart';
 import '../../skills/application/marketplace_controller.dart';
@@ -111,6 +113,7 @@ class ProviderResolver {
     final tools = <AgentTool>[
       ...hermesTools,
       ...cronTools,
+      ...MemoryTools.all(_ref.read(memoryVaultProvider)),
       ...BuiltInTools.all(
         allowedRoots: sandboxRoots,
         activeWorkdir: _ref.read(agentWorkdirProvider),

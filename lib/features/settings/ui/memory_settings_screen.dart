@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocketstrike/app/theme/glass_tokens.dart';
 import 'package:pocketstrike/core/storage/prefs_provider.dart';
+import 'package:pocketstrike/features/memory/ui/memory_vault_screen.dart';
 import 'package:pocketstrike/shared/widgets/app_icons.dart';
 
 class MemorySettingsScreen extends ConsumerStatefulWidget {
@@ -15,6 +16,7 @@ class MemorySettingsScreen extends ConsumerStatefulWidget {
 class _MemorySettingsScreenState extends ConsumerState<MemorySettingsScreen> {
   int _contextWindowSize = 20;
   bool _enableRAG = true;
+  bool _autoSaveNotememori = true;
 
   @override
   void initState() {
@@ -22,12 +24,18 @@ class _MemorySettingsScreenState extends ConsumerState<MemorySettingsScreen> {
     final prefs = ref.read(sharedPreferencesProvider);
     _contextWindowSize = prefs.getInt('memory_context_window') ?? 20;
     _enableRAG = prefs.getBool('memory_enable_rag') ?? true;
+    _autoSaveNotememori =
+        prefs.getBool('memory_autosave_notememori') ?? true;
   }
 
   Future<void> _save() async {
     final prefs = ref.read(sharedPreferencesProvider);
     await prefs.setInt('memory_context_window', _contextWindowSize);
     await prefs.setBool('memory_enable_rag', _enableRAG);
+    await prefs.setBool(
+      'memory_autosave_notememori',
+      _autoSaveNotememori,
+    );
   }
 
   @override
@@ -73,6 +81,43 @@ class _MemorySettingsScreenState extends ConsumerState<MemorySettingsScreen> {
             ),
           ),
           const SizedBox(height: 16),
+
+          Container(
+            decoration: BoxDecoration(
+              color: tokens.glassColor,
+              borderRadius: BorderRadius.circular(tokens.radiusSm),
+              border: Border.all(color: tokens.glassBorder),
+            ),
+            child: ListTile(
+              leading: Icon(Icons.menu_book_outlined, color: tokens.accent),
+              title: const Text('Memory Vault'),
+              subtitle: const Text(
+                'Markdown notes, #notememori tags, [[backlinks]] and @file/folder references',
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const MemoryVaultScreen(),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+          SwitchListTile(
+            title: const Text('Auto-save #notememori chat messages'),
+            subtitle: const Text(
+              'Messages containing #notememori are captured as memory notes',
+            ),
+            value: _autoSaveNotememori,
+            activeThumbColor: tokens.accent,
+            onChanged: (val) {
+              setState(() => _autoSaveNotememori = val);
+              _save();
+            },
+          ),
+          const SizedBox(height: 8),
 
           Text(
             'CONTEXT WINDOW TURNS ($_contextWindowSize messages)',

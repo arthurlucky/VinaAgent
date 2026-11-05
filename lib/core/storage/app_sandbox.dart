@@ -21,6 +21,7 @@ class AppSandbox {
     'Artifacts',
     'Exports',
     'Skills',
+    'Memory',
   ];
 
   /// Absolute sandbox root, created lazily.

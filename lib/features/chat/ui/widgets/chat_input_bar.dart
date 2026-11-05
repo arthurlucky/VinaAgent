@@ -15,6 +15,7 @@ import 'package:pocketstrike/features/chat/ui/widgets/btw_sheet.dart';
 import 'package:pocketstrike/features/conversations/application/conversations_controller.dart';
 import 'package:pocketstrike/features/local_models/data/local_model_info.dart';
 import 'package:pocketstrike/features/local_models/data/local_model_store.dart';
+import 'package:pocketstrike/features/memory/ui/sandbox_mention_sheet.dart';
 import 'package:pocketstrike/features/plugins/application/plugins_controller.dart';
 import 'package:pocketstrike/features/process/ui/task_manager_sheet.dart';
 import 'package:pocketstrike/features/skills/application/skills_controller.dart';
@@ -526,6 +527,27 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
     setState(() {});
   }
 
+  Future<void> _insertMention() async {
+    final path = await SandboxMentionSheet.show(context);
+    if (path == null || !mounted) return;
+    final text = _textController.text;
+    final selection = _textController.selection;
+    final offset = selection.isValid
+        ? selection.baseOffset.clamp(0, text.length).toInt()
+        : text.length;
+    final needsSpace = offset > 0 &&
+        !text.substring(offset - 1, offset).contains(RegExp(r'\s'));
+    final mention = path.contains(RegExp(r'\s')) ? '@"$path"' : '@$path';
+    final insert = '${needsSpace ? ' ' : ''}$mention ';
+    final next = text.replaceRange(offset, offset, insert);
+    _textController.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: offset + insert.length),
+    );
+    _focusNode.requestFocus();
+    setState(() {});
+  }
+
   void _showStepsPicker(BuildContext context, int currentSteps, String? modelId) {
     HapticFeedback.selectionClick();
     showModalBottomSheet(
@@ -982,6 +1004,18 @@ class _ChatInputBarState extends ConsumerState<ChatInputBar> {
                   color: tokens.textSecondary,
                 ),
                 onPressed: widget.enabled ? _openCommands : null,
+              ),
+              IconButton(
+                tooltip: 'Mention a file or folder',
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+                icon: Icon(
+                  Icons.alternate_email,
+                  size: 19,
+                  color: tokens.textSecondary,
+                ),
+                onPressed: widget.enabled ? _insertMention : null,
               ),
               Expanded(
                 child: TextField(

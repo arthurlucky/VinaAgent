@@ -71,11 +71,12 @@ class SkillFormatException implements Exception {
   String toString() => 'SkillFormatException: $message';
 }
 
-/// A skill draft waiting for the user's approval.
+/// A manually authored skill draft waiting for the user's approval.
 ///
-/// Auto-learned and AI-authored skills never become active immediately: they
-/// are stored here, scored by the quality gate, and only written to disk after
-/// an explicit approval in Settings → Agent Skills.
+/// Skills learned automatically from a completed run, and skills created by
+/// the agent's `create_skill` tool, are installed immediately after passing the
+/// quality gate. This queue is for drafts generated manually from the skills
+/// screen, where the user still reviews before activation.
 class PendingSkill {
   const PendingSkill({
     required this.id,

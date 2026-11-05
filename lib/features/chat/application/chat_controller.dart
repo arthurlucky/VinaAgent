@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:pocketstrike/app/theme/theme_controller.dart';
 import 'package:pocketstrike/core/db/app_database.dart';
 import 'package:pocketstrike/core/models/chat_models.dart';
+import 'package:pocketstrike/core/storage/prefs_provider.dart';
 import 'package:pocketstrike/features/agent/application/agent_workdir_controller.dart';
 import 'package:pocketstrike/features/agent/data/agent_engine.dart';
 import 'package:pocketstrike/features/agent/data/hermes_memory_store.dart';
@@ -20,6 +21,7 @@ import 'package:pocketstrike/features/conversations/application/conversations_co
 import 'package:pocketstrike/features/local_models/data/local_model_engine.dart';
 import 'package:pocketstrike/features/local_models/data/local_model_info.dart';
 import 'package:pocketstrike/features/local_models/data/local_model_store.dart';
+import 'package:pocketstrike/features/memory/application/memory_controller.dart';
 import 'package:pocketstrike/features/plugins/application/plugins_controller.dart';
 import 'package:pocketstrike/features/providers/application/providers_controller.dart';
 import 'package:pocketstrike/features/providers/data/mock_provider.dart';
@@ -248,6 +250,21 @@ class ChatController extends StateNotifier<ChatState> {
   }) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty && attachments.isEmpty) return;
+
+    // Quick capture: any message tagged #notememori is also written to the
+    // local Markdown memory vault, without blocking the chat run.
+    if (trimmed.toLowerCase().contains('#notememori')) {
+      final prefs = ref.read(sharedPreferencesProvider);
+      if (prefs.getBool('memory_autosave_notememori') ?? true) {
+        unawaited(() async {
+          try {
+            await ref.read(memoryVaultProvider).captureChatNote(trimmed);
+          } catch (_) {
+            // Quick capture is best-effort and must never block the chat.
+          }
+        }());
+      }
+    }
 
     // 1. Ensure active conversation exists.
     final targetId = conversationId ??
@@ -1029,8 +1046,9 @@ class ChatController extends StateNotifier<ChatState> {
   }
 
   /// Hermes-style reflection: after a non-trivial run, ask the model whether
-  /// the procedure is worth turning into a reusable skill. Drafts always land
-  /// in the pending queue and never activate without approval.
+  /// the procedure is worth turning into a reusable skill. Learned skills are
+  /// activated immediately (no approval step), but only after the quality gate
+  /// passes and only when the name is not already installed.
   void _scheduleSkillLearning({
     required AIProvider provider,
     required String model,
@@ -1078,7 +1096,14 @@ class ChatController extends StateNotifier<ChatState> {
           existing: existing,
           pending: pending,
         );
-        if (draft != null) await store.addPending(draft);
+        if (draft != null && await store.findSkill(draft.name) == null) {
+          await store.createSkill(
+            name: draft.name,
+            description: draft.description,
+            instructions: draft.body,
+            triggers: draft.triggers,
+          );
+        }
       } catch (_) {
         // Reflection is best-effort and must never break the chat.
       }
@@ -1151,6 +1176,15 @@ class ChatController extends StateNotifier<ChatState> {
       );
     }).toList();
 
+    String? latestUserText;
+    for (final message in chatMsgs.reversed) {
+      if (message.role == MessageRole.user &&
+          message.content.trim().isNotEmpty) {
+        latestUserText = message.content;
+        break;
+      }
+    }
+
     final persona = await ref.read(activePersonaProvider.future);
     String systemPrompt = params.systemPrompt ?? '';
 
@@ -1213,15 +1247,6 @@ class ChatController extends StateNotifier<ChatState> {
     // Auto-activate the most relevant skills (Level 2). This makes skills work
     // in plain chat mode too, where tool calling is unavailable.
     if (skillsAvailable) {
-      String? latestUserText;
-      for (final message in chatMsgs.reversed) {
-        if (message.role == MessageRole.user &&
-            message.content.trim().isNotEmpty) {
-          latestUserText = message.content;
-          break;
-        }
-      }
-
       final activated = <AgentSkill>[];
       final forced = activeSkillName?.trim() ?? '';
       if (forced.isNotEmpty) {
@@ -1245,6 +1270,33 @@ class ChatController extends StateNotifier<ChatState> {
             '${skill.description}\n\n'
             '$body';
         systemPrompt = systemPrompt.isEmpty ? block : '$systemPrompt\n\n$block';
+      }
+    }
+
+    // Long-term RAG memory and @file/folder references. Both are local and
+    // read-only; failures must never block a chat run.
+    if (latestUserText != null) {
+      try {
+        final prefs = ref.read(sharedPreferencesProvider);
+        final vault = ref.read(memoryVaultProvider);
+        if (prefs.getBool('memory_enable_rag') ?? true) {
+          final rag = await vault.buildRagContext(
+            latestUserText,
+            limit: localMode ? 2 : 4,
+          );
+          if (rag.isNotEmpty) {
+            systemPrompt =
+                systemPrompt.isEmpty ? rag : '$systemPrompt\n\n$rag';
+          }
+        }
+        final references = await vault.buildReferenceContext(latestUserText);
+        if (references.isNotEmpty) {
+          systemPrompt = systemPrompt.isEmpty
+              ? references
+              : '$systemPrompt\n\n$references';
+        }
+      } catch (_) {
+        // Memory recall is best-effort and must not break the run.
       }
     }
 

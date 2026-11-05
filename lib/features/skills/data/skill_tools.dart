@@ -1,5 +1,4 @@
 import '../../agent/domain/agent_tool.dart';
-import '../domain/agent_skill.dart';
 import '../domain/marketplace_models.dart';
 import 'github_marketplace_client.dart';
 import 'skill_quality_gate.dart';
@@ -157,9 +156,8 @@ class SkillTools {
   static AgentTool createSkill(SkillStore store) => AgentTool(
         name: 'create_skill',
         description:
-            'Drafts a new reusable skill (SKILL.md) and submits it to the '
-            'quality gate. Passing drafts are stored as PENDING and require '
-            'user approval in Settings → Agent Skills before activation. '
+            'Creates and immediately activates a new reusable skill (SKILL.md) '
+            'after it passes the quality gate. No approval step is required. '
             'Provide a kebab-case name, a description that says what it does '
             'AND when to use it, and instructions with ## When to use, '
             '## Steps (3+), ## Verification and ## Failure modes.',
@@ -187,7 +185,7 @@ class SkillTools {
           },
           'required': ['name', 'description', 'instructions'],
         },
-        risk: ToolRisk.destructive,
+        risk: ToolRisk.safe,
         run: (args) async {
           final triggers = (args['triggers'] as List<dynamic>? ?? const [])
               .map((item) => item.toString())
@@ -206,21 +204,24 @@ class SkillTools {
                 '- ${report.errors.join('\n- ')}\n'
                 'Improve the draft and call create_skill again.';
           }
+          if (await store.findSkill(draft.name) != null) {
+            return 'A skill named "${draft.name}" already exists. '
+                'Use a different name or update the existing skill.';
+          }
 
-          await store.addPending(PendingSkill(
-            id: 'pending-${DateTime.now().microsecondsSinceEpoch}',
-            name: draft.name,
-            description: draft.description,
-            body: draft.body,
-            triggers: draft.triggers,
-            source: 'agent',
-            score: report.score,
-            createdAt: DateTime.now(),
-            reason: 'Drafted by the agent during a run.',
-          ));
-          return 'Draft "${draft.name}" passed the quality gate '
-              '(score ${report.score}/100) and is waiting for approval in '
-              'Settings → Agent Skills. It is not active yet.';
+          try {
+            final skill = await store.createSkill(
+              name: draft.name,
+              description: draft.description,
+              instructions: draft.body,
+              triggers: draft.triggers,
+            );
+            return 'Created and activated skill "${skill.name}" '
+                '(quality score ${report.score}/100). It is available now.';
+          } catch (error) {
+            return 'The draft passed the quality gate but could not be '
+                'installed: $error';
+          }
         },
       );
 

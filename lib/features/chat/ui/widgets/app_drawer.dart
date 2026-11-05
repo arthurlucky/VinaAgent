@@ -297,6 +297,47 @@ class _AppDrawerState extends ConsumerState<AppDrawer> {
                       ),
                     ),
                   ),
+
+                  // ---- Memory Vault (Obsidian-style local notes) ----
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+                    child: Material(
+                      color: tokens.glassColor,
+                      borderRadius: BorderRadius.circular(tokens.radiusSm),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(tokens.radiusSm),
+                        onTap: () {
+                          Navigator.of(context).maybePop();
+                          context.push(AppRoutes.settingsMemoryVault);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(tokens.radiusSm),
+                            border: Border.all(color: tokens.glassBorder, width: 0.8),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.menu_book_outlined,
+                                  size: 16, color: tokens.accent),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Memory Vault',
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                ),
+                              ),
+                              Icon(Icons.chevron_right,
+                                  size: 16, color: tokens.textSecondary),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 6),
 
                   // ---- 2. Search Chat Section ----
