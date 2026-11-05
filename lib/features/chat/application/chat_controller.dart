@@ -243,6 +243,8 @@ class ChatController extends StateNotifier<ChatState> {
     Set<String> preApprovedTools = const {},
     /// Overrides the normal confirmation policy for this run.
     ConfirmationPolicy? policyOverride,
+    /// Headless runs deny any tool that would need a confirmation dialog.
+    bool headless = false,
   }) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty && attachments.isEmpty) return;
@@ -295,6 +297,7 @@ class ChatController extends StateNotifier<ChatState> {
         forceCloudMode: forceCloudMode,
         preApprovedTools: preApprovedTools,
         policyOverride: policyOverride,
+        headless: headless,
       );
     } catch (error) {
       _updateRun(
@@ -344,6 +347,7 @@ class ChatController extends StateNotifier<ChatState> {
     bool forceCloudMode = false,
     Set<String> preApprovedTools = const {},
     ConfirmationPolicy? policyOverride,
+    bool headless = false,
   }) async {
     final agentMode = forceAgentMode || state.agentMode;
     final localMode = forceCloudMode ? false : state.localMode;
@@ -471,6 +475,7 @@ class ChatController extends StateNotifier<ChatState> {
         cancelToken: cancelToken,
         preApprovedTools: preApprovedTools,
         policyOverride: policyOverride,
+        headless: headless,
       );
     } else {
       await _runPlainChat(
@@ -671,6 +676,7 @@ class ChatController extends StateNotifier<ChatState> {
     required CancelToken cancelToken,
     Set<String> preApprovedTools = const {},
     ConfirmationPolicy? policyOverride,
+    bool headless = false,
   }) async {
     final tools = await _availableTools(conversationId);
     final forceConfirm = await _forcedMcpConfirmations(conversationId);
@@ -705,6 +711,7 @@ class ChatController extends StateNotifier<ChatState> {
       forceConfirm: forceConfirm,
       cancelToken: cancelToken,
       requestConfirmation: (tool, call) async {
+        if (headless) return ConfirmResult.deny;
         final handler = confirmHandler;
         if (handler == null) return ConfirmResult.deny;
         final result = await handler(tool, call);

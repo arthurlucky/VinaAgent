@@ -351,6 +351,7 @@ class CronTaskNotifier extends Notifier<List<CronTask>> {
             // Headless runs cannot show confirmation dialogs, so keep
             // destructive/external tools blocked unless explicitly approved.
             policyOverride: ConfirmationPolicy.destructiveOnly,
+            headless: true,
           );
 
       await db.conversationsDao.touch(convId);
