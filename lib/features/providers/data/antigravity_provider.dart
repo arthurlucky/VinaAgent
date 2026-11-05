@@ -6,7 +6,6 @@ import '../../../core/models/chat_models.dart';
 import '../domain/ai_provider.dart';
 import '../domain/provider_types.dart';
 import 'antigravity_helper.dart';
-import 'antigravity_oauth.dart';
 import 'sse_parser.dart';
 
 /// Native Google Antigravity (Google Cloud Code Assist) provider.
