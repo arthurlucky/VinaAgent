@@ -235,6 +235,14 @@ class ChatController extends StateNotifier<ChatState> {
     List<AttachmentMeta> attachments = const [],
     String? activeSkillName,
     String? conversationId,
+    /// Forces the agent loop even when the UI is in plain-chat mode.
+    bool forceAgentMode = false,
+    /// Ignores local/demo mode and uses the configured cloud provider.
+    bool forceCloudMode = false,
+    /// Tools that may run without a confirmation prompt for this run.
+    Set<String> preApprovedTools = const {},
+    /// Overrides the normal confirmation policy for this run.
+    ConfirmationPolicy? policyOverride,
   }) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty && attachments.isEmpty) return;
@@ -283,6 +291,10 @@ class ChatController extends StateNotifier<ChatState> {
         attachments: attachments,
         activeSkillName: activeSkillName,
         cancelToken: cancelToken,
+        forceAgentMode: forceAgentMode,
+        forceCloudMode: forceCloudMode,
+        preApprovedTools: preApprovedTools,
+        policyOverride: policyOverride,
       );
     } catch (error) {
       _updateRun(
@@ -328,7 +340,15 @@ class ChatController extends StateNotifier<ChatState> {
     required List<AttachmentMeta> attachments,
     required String? activeSkillName,
     required CancelToken cancelToken,
+    bool forceAgentMode = false,
+    bool forceCloudMode = false,
+    Set<String> preApprovedTools = const {},
+    ConfirmationPolicy? policyOverride,
   }) async {
+    final agentMode = forceAgentMode || state.agentMode;
+    final localMode = forceCloudMode ? false : state.localMode;
+    final demoMode = forceCloudMode ? false : state.demoMode;
+
     await ref.read(pluginControllerProvider.notifier).ensureReady();
     await ref.read(pluginControllerProvider.notifier).runLifecycleHook(
       'before_send',
@@ -356,11 +376,11 @@ class ChatController extends StateNotifier<ChatState> {
 
     // In Agent Mode, natural language requests ("generate an image of...") are executed by the Agent using the generate_image tool.
     // In Plain Mode, both slash and natural language commands trigger direct synthesis.
-    final isExplicitImage = state.agentMode
+    final isExplicitImage = agentMode
         ? isSlashImageCommand
         : (isSlashImageCommand || isNaturalImageCommand);
 
-    if (state.localMode || isExplicitImage) {
+    if (localMode || isExplicitImage) {
       final localStore = ref.read(localModelStoreProvider);
       final activeLocal = localStore.activeModel;
       provider = LocalAIProvider(activeModel: activeLocal);
@@ -369,7 +389,7 @@ class ChatController extends StateNotifier<ChatState> {
         temperature: 0.7,
         maxTokens: activeLocal?.contextSize ?? 2048,
       );
-    } else if (state.demoMode) {
+    } else if (demoMode) {
       provider = const MockProvider();
       model = 'mock-v1';
       params = const GenerationParams();
@@ -422,11 +442,13 @@ class ChatController extends StateNotifier<ChatState> {
       conversationId,
       params,
       activeSkillName: activeSkillName,
+      agentModeOverride: agentMode,
+      localModeOverride: localMode,
     );
 
     final localStore = ref.read(localModelStoreProvider);
     final isImageRequest =
-        (state.localMode && localStore.activeModel?.type == LocalModelType.imageModel) ||
+        (localMode && localStore.activeModel?.type == LocalModelType.imageModel) ||
             isExplicitImage;
 
     _updateRun(
@@ -439,7 +461,7 @@ class ChatController extends StateNotifier<ChatState> {
       ),
     );
 
-    if (state.agentMode) {
+    if (agentMode) {
       await _runAgent(
         conversationId: conversationId,
         provider: provider,
@@ -447,6 +469,8 @@ class ChatController extends StateNotifier<ChatState> {
         params: params,
         history: history,
         cancelToken: cancelToken,
+        preApprovedTools: preApprovedTools,
+        policyOverride: policyOverride,
       );
     } else {
       await _runPlainChat(
@@ -645,6 +669,8 @@ class ChatController extends StateNotifier<ChatState> {
     required GenerationParams params,
     required List<ChatMessage> history,
     required CancelToken cancelToken,
+    Set<String> preApprovedTools = const {},
+    ConfirmationPolicy? policyOverride,
   }) async {
     final tools = await _availableTools(conversationId);
     final forceConfirm = await _forcedMcpConfirmations(conversationId);
@@ -674,8 +700,8 @@ class ChatController extends StateNotifier<ChatState> {
       model: model,
       params: params,
       tools: tools,
-      policy: _policy,
-      sessionApproved: _sessionApprovedTools,
+      policy: policyOverride ?? _policy,
+      sessionApproved: {..._sessionApprovedTools, ...preApprovedTools},
       forceConfirm: forceConfirm,
       cancelToken: cancelToken,
       requestConfirmation: (tool, call) async {
@@ -1077,7 +1103,11 @@ class ChatController extends StateNotifier<ChatState> {
     String conversationId,
     GenerationParams params, {
     String? activeSkillName,
+    bool? agentModeOverride,
+    bool? localModeOverride,
   }) async {
+    final agentMode = agentModeOverride ?? state.agentMode;
+    final localMode = localModeOverride ?? state.localMode;
     final rawMsgs = await ref
         .read(appDatabaseProvider)
         .messagesDao
@@ -1124,7 +1154,7 @@ class ChatController extends StateNotifier<ChatState> {
           : '$systemPrompt\n\n$pPrompt';
     }
 
-    if (!state.localMode) {
+    if (!localMode) {
       final hermesContext = ref.read(hermesMemoryProvider.notifier).buildHermesSystemPrompt();
       systemPrompt = systemPrompt.isEmpty
           ? hermesContext
@@ -1146,7 +1176,7 @@ class ChatController extends StateNotifier<ChatState> {
           .toList();
     }
 
-    if (state.agentMode) {
+    if (agentMode) {
       const agentImageInstruction =
           'You have full capabilities to generate images using the "generate_image" tool. When the user asks you to generate, create, draw, paint, design, or render an image, artwork, illustration, photo, or wallpaper, ALWAYS call the "generate_image" tool with a detailed, creative visual prompt and "1:1" aspect ratio unless specified otherwise.';
       const sandboxInstruction =
@@ -1200,7 +1230,7 @@ class ChatController extends StateNotifier<ChatState> {
       }
 
       for (final skill in activated) {
-        final maxChars = state.localMode ? 1800 : 5000;
+        final maxChars = localMode ? 1800 : 5000;
         final body = skill.body.length > maxChars
             ? '${skill.body.substring(0, maxChars)}\n\n[...truncated]'
             : skill.body;
