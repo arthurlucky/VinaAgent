@@ -2,13 +2,16 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:pocketstrike/app/theme/glass_tokens.dart';
 import 'package:pocketstrike/core/models/chat_models.dart';
 import 'package:pocketstrike/shared/widgets/app_icons.dart';
 import 'package:pocketstrike/shared/widgets/glass_button.dart';
 import 'package:pocketstrike/features/providers/application/providers_controller.dart';
+import 'package:pocketstrike/features/providers/data/antigravity_oauth.dart';
 import 'package:pocketstrike/features/providers/data/provider_registry.dart';
 import 'package:pocketstrike/features/providers/domain/provider_types.dart';
+import 'package:pocketstrike/features/settings/ui/antigravity_login_dialog.dart';
 import 'package:pocketstrike/core/db/app_database.dart';
 
 class ProviderEditScreen extends ConsumerStatefulWidget {
@@ -29,6 +32,7 @@ class _ProviderEditScreenState extends ConsumerState<ProviderEditScreen> {
   bool _makeDefault = false;
   bool _testing = false;
   bool _fetchingModels = false;
+  bool _oauthBusy = false;
   String? _testResult;
   bool _testSuccess = false;
 
@@ -57,6 +61,68 @@ class _ProviderEditScreenState extends ConsumerState<ProviderEditScreen> {
         _modelController.text = config.defaultModel;
         _makeDefault = config.isDefault;
       });
+    }
+  }
+
+  /// Runs the loopback Google OAuth flow and stores the resulting credentials
+  /// in the API key field as a JSON blob.
+  Future<void> _loginWithGoogle() async {
+    if (_oauthBusy) return;
+    setState(() => _oauthBusy = true);
+    final service = AntigravityOAuthService();
+    try {
+      final session = await service.start();
+      if (!mounted) return;
+
+      try {
+        await launchUrl(
+          Uri.parse(session.authUrl),
+          mode: LaunchMode.externalApplication,
+        );
+      } catch (_) {
+        // The dialog offers "Open browser" and "Copy link" fallbacks.
+      }
+      if (!mounted) return;
+
+      final result = await showDialog<AntigravityOAuthResult>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AntigravityLoginDialog(
+          session: session,
+          service: service,
+        ),
+      );
+
+      if (result != null) {
+        if (!mounted) return;
+        setState(() {
+          _keyController.text = result.toCredentialsJson();
+          if (_modelController.text.trim().isEmpty) {
+            _modelController.text =
+                _selectedType.suggestedModels.isNotEmpty
+                    ? _selectedType.suggestedModels.first
+                    : 'gemini-3-pro-preview';
+          }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              result.email == null
+                  ? 'Google account connected.'
+                  : 'Connected as ${result.email}.',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not start Google login: $e')),
+        );
+      }
+    } finally {
+      await service.dispose();
+      if (mounted) setState(() => _oauthBusy = false);
     }
   }
 
@@ -405,7 +471,7 @@ class _ProviderEditScreenState extends ConsumerState<ProviderEditScreen> {
               hintText: isEditing
                   ? '••••••••••••••••'
                   : _selectedType == ProviderType.antigravity
-                      ? 'Bearer access token (ya29...) or JSON credentials'
+                      ? 'Use “Login with Google” below, or paste a token/JSON'
                       : 'Enter API Key',
               filled: true,
               fillColor: tokens.glassColor,
@@ -415,6 +481,46 @@ class _ProviderEditScreenState extends ConsumerState<ProviderEditScreen> {
               ),
             ),
           ),
+          if (_selectedType == ProviderType.antigravity) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _oauthBusy ? null : _loginWithGoogle,
+                icon: _oauthBusy
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(AppIcons.key, size: 16, color: tokens.accent),
+                label: Text(
+                  _oauthBusy
+                      ? 'Waiting for Google login...'
+                      : 'Login with Google',
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: tokens.accent,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  side: BorderSide(color: tokens.accent.withValues(alpha: 0.4)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(tokens.radiusSm),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Opens Google sign-in in your browser. The authorization code is '
+              'captured automatically on localhost:51121 — no manual token '
+              'extraction needed.',
+              style: TextStyle(
+                fontSize: 11.5,
+                height: 1.4,
+                color: tokens.textSecondary,
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
 
           // Custom Base URL

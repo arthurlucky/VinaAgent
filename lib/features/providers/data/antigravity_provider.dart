@@ -6,6 +6,7 @@ import '../../../core/models/chat_models.dart';
 import '../domain/ai_provider.dart';
 import '../domain/provider_types.dart';
 import 'antigravity_helper.dart';
+import 'antigravity_oauth.dart';
 import 'sse_parser.dart';
 
 /// Native Google Antigravity (Google Cloud Code Assist) provider.
@@ -38,9 +39,8 @@ class AntigravityProvider implements AIProvider {
   AntigravityCredentials? _credentials;
   String? _resolvedProjectId;
 
-  static const String _defaultUserAgent = 'antigravity/hub/2.2.1 darwin/arm64';
-  static const String _defaultGoogApiClient =
-      'google-cloud-sdk vscode_cloudshelleditor/0.1';
+  static const String _defaultUserAgent = AntigravityHelper.userAgent;
+  static const String _defaultGoogApiClient = AntigravityHelper.googApiClient;
 
   @override
   String get displayName => ProviderType.antigravity.displayName;
@@ -63,21 +63,19 @@ class AntigravityProvider implements AIProvider {
   /// Ensures a valid access token is ready, attempting refresh if expired.
   Future<String> _ensureAccessToken() async {
     final creds = _credentials;
-    if (creds == null || creds.accessToken.isEmpty) {
+    if (creds == null) {
       throw Exception('Missing Antigravity access token or credentials.');
     }
 
-    if (creds.isExpired &&
-        creds.refreshToken != null &&
-        creds.refreshToken!.isNotEmpty &&
-        creds.clientId != null &&
-        creds.clientSecret != null) {
+    final needsRefresh =
+        creds.accessToken.isEmpty || creds.isExpired || creds.expiresAt == null;
+    if (needsRefresh && creds.canRefresh) {
       try {
         final resp = await _dio.post<Map<String, dynamic>>(
-          'https://oauth2.googleapis.com/token',
+          AntigravityOAuthConfig.tokenEndpoint,
           data: {
-            'client_id': creds.clientId,
-            'client_secret': creds.clientSecret,
+            'client_id': creds.effectiveClientId,
+            'client_secret': creds.effectiveClientSecret,
             'refresh_token': creds.refreshToken,
             'grant_type': 'refresh_token',
           },
@@ -99,6 +97,12 @@ class AntigravityProvider implements AIProvider {
       }
     }
 
+    if (creds.accessToken.isEmpty) {
+      throw Exception(
+        'Antigravity credentials have no access token and could not be '
+        'refreshed. Sign in again from the provider settings.',
+      );
+    }
     return creds.accessToken;
   }
 
@@ -139,9 +143,7 @@ class AntigravityProvider implements AIProvider {
 
       final data = resp.data;
       if (data is Map<String, dynamic>) {
-        final proj = data['cloudaicompanionProject']?.toString() ??
-            data['currentProject']?.toString() ??
-            data['project']?.toString();
+        final proj = AntigravityHelper.extractProjectId(data);
         if (proj != null && proj.isNotEmpty) {
           _resolvedProjectId = proj;
           return proj;
