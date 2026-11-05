@@ -50,6 +50,16 @@ never overwritten.
 | `search_skill_marketplace` | Search public GitHub skill repositories |
 | `install_marketplace_skill` | Download and install a marketplace skill |
 
+## Automatic learning
+
+After a complex run (5+ observations, a tool error, or a user correction) the
+agent reflects on the trajectory, asks the model for a reusable skill, and
+validates it with the quality gate. Passing skills are installed immediately —
+there is no approval step. The `create_skill` tool follows the same rule.
+
+Manual drafts generated from **Settings → Agent Skills → Generate** still go
+through the pending queue so you can review them before activation.
+
 ## Skill marketplace
 
 `Settings > Agent Skills > storefront icon` opens the marketplace.
