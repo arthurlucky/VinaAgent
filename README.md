@@ -30,8 +30,9 @@ VinaAgent/
 │       ├── files/              # Sandboxed File Manager (Create, Move, ZIP Compress/Extract/Preview)
 │       ├── local_models/       # Native GGUF inference runtime, model downloader & presets
 │       ├── mcp/                # MCP protocol client (Streamable HTTP & SSE) & marketplace
+│       ├── memory/             # Obsidian-style Markdown vault, RAG recall & @file/folder tools
 │       ├── providers/          # Multi-provider gateways (OpenAI, Claude, Gemini, DeepSeek, Ollama)
-│       ├── settings/           # Local models, MCP, Storage, API keys, & Hermes memory UI
+│       ├── settings/           # Local models, MCP, Storage, API keys, & memory/skill UI
 │       └── telegram/           # Telegram Bot autonomous background relay service
 └── test/                       # Unit and widget test suite
 ```
@@ -55,6 +56,9 @@ VinaAgent/
 - 🤖 **Autonomous ReAct Agent Engine**: Multi-step tool execution with step-by-step reasoning logs, real-time status chips, and configurable confirmation safety gates.
 - 🔌 **Model Context Protocol (MCP) Marketplace**: Native Streamable HTTP & SSE transport support with 11+ built-in servers (Brave Search, GitHub, Puppeteer, PostgreSQL, Memory Graph, Hardware Specs, etc.).
 - 🌌 **Hermes Self-Evolving Memory System**: Persistent `USER.md`, `MEMORY.md`, and `SOUL.md` files that autonomously learn your personality, preferences, and context across sessions.
+- 🧠 **Obsidian-Style Local Memory Vault**: Plain Markdown notes under `VinaAgent/Memory`, with `#notememori` RAG recall, `[[WikiLinks]]` and backlinks, full-text search, a built-in note editor, and `@file/folder` references that inject sandbox content into the agent context.
+- 🧬 **Experience-Driven Skill Learning**: After complex runs the agent reflects, passes a quality gate, and installs the new `SKILL.md` automatically — no approval step. The `create_skill` tool works the same way.
+- ⏰ **Scheduled Agent Tasks**: Cron-style reminders and autonomous agent runs (`hourly`, `every_30m`, `daily@HH:mm`) that can search the web and notify you through Android and Telegram.
 - 🤖 **Telegram Autonomous Remote Relay**: Turn your phone into a 24/7 background AI assistant that receives prompts and replies over Telegram.
 - 🎨 **Cyberpunk Glassmorphism UI**: Isolated backdrop blur, dark/light themes, syntax-highlighted code blocks, and haptic feedback.
 
@@ -163,6 +167,19 @@ flutter build apk --release
 ```
 The optimized release APK will be generated at:
 `build/app/outputs/flutter-apk/app-release.apk`
+
+---
+
+## 🧠 Memory Vault & Mentions
+
+Open **Settings → Memory → Memory Vault** (or the drawer shortcut) to manage the local-first knowledge base.
+
+- **Markdown notes**: Every note is a normal `.md` file under `<app documents>/VinaAgent/Memory`, so it is visible in the sandbox File Manager and can be edited outside the app.
+- **`#notememori`**: Tag a note with `#notememori` to make it eligible for automatic RAG recall. Typing `#notememori` in a chat message also captures that message as a memory note (toggle in Memory settings).
+- **`[[WikiLinks]]` and backlinks**: Link notes with `[[Note title]]`; the editor shows both outgoing links and backlinks.
+- **`@file/folder` references**: Tap the `@` button in the composer or note editor to insert a sandbox path. The referenced file content (or folder listing) is injected into the agent context for that turn.
+- **Search & tags**: Search titles, bodies, paths, and tags; filter to only `#notememori` notes.
+- **Auto-learned skills**: After a sufficiently complex run, the agent reflects on the trajectory, validates the draft with the quality gate, and installs it immediately. No approval is required.
 
 ---
 
