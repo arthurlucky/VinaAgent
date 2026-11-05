@@ -89,13 +89,14 @@ void main() {
         'Remember the API key rotation #notememori',
       );
       expect(note, isNotNull);
-      expect(note!.isMemory, isTrue);
-      expect(note.body, contains('#notememori'));
+      final saved = note!;
+      expect(saved.isMemory, isTrue);
+      expect(saved.body, contains('#notememori'));
 
       final duplicate = await vault.captureChatNote(
         'Remember the API key rotation #notememori',
       );
-      expect(duplicate?.path, note.path);
+      expect(duplicate?.path, saved.path);
     });
 
     test('finds backlinks between notes', () async {
